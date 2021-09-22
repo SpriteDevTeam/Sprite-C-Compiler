@@ -8,7 +8,7 @@ void condition_test() {
             a = 3;
         }
         else {
-            if (x <<= a &= 2) a = 4;
+            if (x <<= (*&a) &= 2) a = 4;
         }
     }
     else a = 5;

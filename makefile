@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -Wall -Wno-unused-label -g
+CFLAGS = -Wall -Wno-unused-label -Wno-unused-variable -g
 EXE = main
 OBJS = main.o Token.o List.o Scanner.o Parser.o AST.o
 TEST_DIR = ./test
@@ -23,8 +23,9 @@ $(OBJS): %.o: %.cc
 
 debug: $(TEST_DIR)/*
 	@for file in $^; do \
-		echo ./$(EXE) $${file} ; \
-		./$(EXE) $${file} ; \
+		echo $${file}; \
+		./$(EXE) $${file}; \
+		echo; \
 	done
 
 clean:

@@ -89,9 +89,9 @@
 //               | <id> = <number> , <enum_list>
 //               | <id> , <enum_list>
 //
-// <def> ::= <type> <id> ( ) { <stmt_list> }
+// <def> ::= struct <id> { <mem_decl_list> } ;
 //         | <type> <id> ( <arg_list> ) { <stmt_list> }
-//         | struct <id> { <mem_decl_list> } ;
+//         | <type> <id> ( ) { <stmt_list> }
 //
 // <mem_decl_list> ::= <type> <id> ; <mem_decl_list>
 //                   | epsilon
@@ -134,16 +134,16 @@
 // <jump_stmt> ::= break ;
 //               | continue ;
 //
-// <return_stmt> ::= return ;
-//                 | return <expr> ;
+// <return_stmt> ::= return <expr> ;
+//                 | return ;
 //
 // <type> ::= int *
-//          | char *
-//          | void *
-//          | struct <id> *
 //          | int
+//          | char *
 //          | char
+//          | void *
 //          | void
+//          | struct <id> *
 //          | struct <id>
 //
 // <expr> ::= <cond_expr> <eq_op> <expr>
