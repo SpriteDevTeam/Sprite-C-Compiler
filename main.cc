@@ -3,6 +3,7 @@
 #include "List"
 #include "Scanner.h"
 #include "Token.h"
+#include "AST.h"
 
 int main(int argc, char* argv[]) {
   // maybe some checks to argc and argv
@@ -12,13 +13,16 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  // preliminarily tokenize the input file
   List<Token>* list = new List<Token>();
   scanner(list, file);
   file.close();
   check_scan_error(list);
 
-  list->display();
+  //list->display();
+
+  build_AST(list);
+
+  std::printf("Parsing succeed.\n");
 
   delete list;
   return 0;

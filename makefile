@@ -1,10 +1,15 @@
 CC = g++
-CFLAGS = -Wall
+CFLAGS = -Wall -Wno-unused-label -g
 EXE = main
-OBJS = main.o Token.o List.o Scanner.o
+OBJS = main.o Token.o List.o Scanner.o Parser.o AST.o
+TEST_DIR = ./test
 
-ifdef OS
-	RM = del
+ifdef OS # only windows define OS
+	ifdef PATH # mingw
+		RM = rm -f
+	else
+		RM = del
+	endif
 	EXE := $(EXE).exe
 else
 	RM = rm -f
@@ -16,8 +21,11 @@ all: $(OBJS)
 $(OBJS): %.o: %.cc
 	$(CC) $(CFLAGS) -c $< -o $@
 
-debug:
-	./$(EXE) ./test/debug.sc
+debug: $(TEST_DIR)/*
+	@for file in $^; do \
+		echo ./$(EXE) $${file} ; \
+		./$(EXE) $${file} ; \
+	done
 
 clean:
 	$(RM) $(OBJS) $(EXE)
