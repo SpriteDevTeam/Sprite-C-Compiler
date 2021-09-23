@@ -1,5 +1,5 @@
-#ifndef __AST_H__
-#define __AST_H__
+#ifndef __CST_H__
+#define __CST_H__
 
 #include <string>
 #include <vector>
@@ -7,8 +7,8 @@
 #include "Token.h"
 
 #define INIT(ast_type) \
-  ASTNode* node = new ASTNode(ast_type, ""); \
-  ASTNode* temp = nullptr; \
+  CSTNode* node = new CSTNode(ast_type, ""); \
+  CSTNode* temp = nullptr; \
   ListNode<Token>* token_copy = token;
 
 #define RESTORE() \
@@ -39,25 +39,25 @@
   if (token->data->type == _type) { \
     std::string content = token->data->content; \
     if (token_forward(token)) \
-      return new ASTNode(ast_type, content); \
+      return new CSTNode(ast_type, content); \
     else goto fail_rule; \
   } \
   else goto next_rule;
 
-#define TERMINAL_CONTENT_NF(terminal, next_rule, fail_rule) \
+#define TERMINAL_CONTENT_NF(terminal, ast_type, next_rule, fail_rule) \
   if (token->data->content == terminal) { \
     std::string content = token->data->content; \
     if (token_forward(token)) \
-      return new ASTNode(TOKEN, content); \
+      return new CSTNode(ast_type, content); \
     else goto fail_rule; \
   } \
   else goto next_rule;
 
-#define TERMINAL_CONTENT_NO_CHECK_N(terminal, next_rule) \
+#define TERMINAL_CONTENT_NO_CHECK_N(terminal, ast_type, next_rule) \
   if (token->data->content == terminal) { \
     std::string content = token->data->content; \
     token_forward(token); \
-    return new ASTNode(TOKEN, content); \
+    return new CSTNode(ast_type, content); \
   } \
   else goto next_rule;
 
@@ -316,81 +316,78 @@ enum {
   _ARROW
 };
 
-struct ASTNode {
+struct CSTNode {
   int type;
   std::string content;
-  std::vector<ASTNode*> children;
-  ASTNode(int _type, std::string content);
+  std::vector<CSTNode*> children;
+  CSTNode(int _type, std::string content);
 };
 
-ASTNode* build_AST(List<Token>* list);
-void destruct_AST(ASTNode* node);
+// CST functions
+CSTNode* prog(ListNode<Token>* &token);
+CSTNode* decl(ListNode<Token>* &token);
+CSTNode* arg_list(ListNode<Token>* &token);
+CSTNode* enum_list(ListNode<Token>* &token);
+CSTNode* def(ListNode<Token>* &token);
+CSTNode* mem_decl_list(ListNode<Token>* &token);
+CSTNode* stmt_list(ListNode<Token>* &token);
+CSTNode* stmt(ListNode<Token>* &token);
+CSTNode* simple(ListNode<Token>* &token);
+CSTNode* assign_op(ListNode<Token>* &token);
+CSTNode* postfix_op(ListNode<Token>* &token);
+CSTNode* if_stmt(ListNode<Token>* &token);
+CSTNode* for_stmt(ListNode<Token>* &token);
+CSTNode* jump_stmt(ListNode<Token>* &token);
+CSTNode* return_stmt(ListNode<Token>* &token);
+CSTNode* type(ListNode<Token>* &token);
+CSTNode* expr(ListNode<Token>* &token);
+CSTNode* eq_op(ListNode<Token>* &token);
+CSTNode* cond_expr(ListNode<Token>* &token);
+CSTNode* cond_op(ListNode<Token>* &token);
+CSTNode* shift_expr(ListNode<Token>* &token);
+CSTNode* shift_op(ListNode<Token>* &token);
+CSTNode* add_expr(ListNode<Token>* &token);
+CSTNode* add_op(ListNode<Token>* &token);
+CSTNode* mul_expr(ListNode<Token>* &token);
+CSTNode* mul_op(ListNode<Token>* &token);
+CSTNode* unary_expr(ListNode<Token>* &token);
+CSTNode* unary_op(ListNode<Token>* &token);
+CSTNode* term(ListNode<Token>* &token);
+CSTNode* keyword_func(ListNode<Token>* &token);
+CSTNode* lvalue(ListNode<Token>* &token);
+CSTNode* entity(ListNode<Token>* &token);
+CSTNode* para_list(ListNode<Token>* &token);
 
-// AST functions
-ASTNode* prog(ListNode<Token>* &token);
-ASTNode* decl(ListNode<Token>* &token);
-ASTNode* arg_list(ListNode<Token>* &token);
-ASTNode* enum_list(ListNode<Token>* &token);
-ASTNode* def(ListNode<Token>* &token);
-ASTNode* mem_decl_list(ListNode<Token>* &token);
-ASTNode* stmt_list(ListNode<Token>* &token);
-ASTNode* stmt(ListNode<Token>* &token);
-ASTNode* simple(ListNode<Token>* &token);
-ASTNode* assign_op(ListNode<Token>* &token);
-ASTNode* postfix_op(ListNode<Token>* &token);
-ASTNode* if_stmt(ListNode<Token>* &token);
-ASTNode* for_stmt(ListNode<Token>* &token);
-ASTNode* jump_stmt(ListNode<Token>* &token);
-ASTNode* return_stmt(ListNode<Token>* &token);
-ASTNode* type(ListNode<Token>* &token);
-ASTNode* expr(ListNode<Token>* &token);
-ASTNode* eq_op(ListNode<Token>* &token);
-ASTNode* cond_expr(ListNode<Token>* &token);
-ASTNode* cond_op(ListNode<Token>* &token);
-ASTNode* shift_expr(ListNode<Token>* &token);
-ASTNode* shift_op(ListNode<Token>* &token);
-ASTNode* add_expr(ListNode<Token>* &token);
-ASTNode* add_op(ListNode<Token>* &token);
-ASTNode* mul_expr(ListNode<Token>* &token);
-ASTNode* mul_op(ListNode<Token>* &token);
-ASTNode* unary_expr(ListNode<Token>* &token);
-ASTNode* unary_op(ListNode<Token>* &token);
-ASTNode* term(ListNode<Token>* &token);
-ASTNode* keyword_func(ListNode<Token>* &token);
-ASTNode* lvalue(ListNode<Token>* &token);
-ASTNode* entity(ListNode<Token>* &token);
-ASTNode* para_list(ListNode<Token>* &token);
+CSTNode* id(ListNode<Token>* &token);
+CSTNode* number(ListNode<Token>* &token);
+CSTNode* char_lit(ListNode<Token>* &token);
+CSTNode* string_lit(ListNode<Token>* &token);
 
-ASTNode* id(ListNode<Token>* &token);
-ASTNode* number(ListNode<Token>* &token);
-ASTNode* char_lit(ListNode<Token>* &token);
-ASTNode* string_lit(ListNode<Token>* &token);
-
-ASTNode* _left_paren(ListNode<Token>* &token);
-ASTNode* _right_paren(ListNode<Token>* &token);
-ASTNode* _semicolon(ListNode<Token>* &token);
-ASTNode* _equals(ListNode<Token>* &token);
-ASTNode* _struct(ListNode<Token>* &token);
-ASTNode* _enum(ListNode<Token>* &token);
-ASTNode* _left_brace(ListNode<Token>* &token);
-ASTNode* _right_brace(ListNode<Token>* &token);
-ASTNode* _comma(ListNode<Token>* &token);
-ASTNode* _epsilon(ListNode<Token>* &token);
-ASTNode* _if(ListNode<Token>* &token);
-ASTNode* _else(ListNode<Token>* &token);
-ASTNode* _for(ListNode<Token>* &token);
-ASTNode* _break(ListNode<Token>* &token);
-ASTNode* _continue(ListNode<Token>* &token);
-ASTNode* _return(ListNode<Token>* &token);
-ASTNode* _int(ListNode<Token>* &token);
-ASTNode* _char(ListNode<Token>* &token);
-ASTNode* _void(ListNode<Token>* &token);
-ASTNode* _asterisk(ListNode<Token>* &token);
-ASTNode* _ampersand(ListNode<Token>* &token);
-ASTNode* _left_bracket(ListNode<Token>* &token);
-ASTNode* _right_bracket(ListNode<Token>* &token);
-ASTNode* _dot(ListNode<Token>* &token);
-ASTNode* _arrow(ListNode<Token>* &token);
+CSTNode* _left_paren(ListNode<Token>* &token);
+CSTNode* _right_paren(ListNode<Token>* &token);
+CSTNode* _semicolon(ListNode<Token>* &token);
+CSTNode* _equals(ListNode<Token>* &token);
+CSTNode* _struct(ListNode<Token>* &token);
+CSTNode* _enum(ListNode<Token>* &token);
+CSTNode* _left_brace(ListNode<Token>* &token);
+CSTNode* _right_brace(ListNode<Token>* &token);
+CSTNode* _comma(ListNode<Token>* &token);
+CSTNode* _epsilon(ListNode<Token>* &token);
+CSTNode* _if(ListNode<Token>* &token);
+CSTNode* _else(ListNode<Token>* &token);
+CSTNode* _for(ListNode<Token>* &token);
+CSTNode* _break(ListNode<Token>* &token);
+CSTNode* _continue(ListNode<Token>* &token);
+CSTNode* _return(ListNode<Token>* &token);
+CSTNode* _int(ListNode<Token>* &token);
+CSTNode* _char(ListNode<Token>* &token);
+CSTNode* _void(ListNode<Token>* &token);
+CSTNode* _asterisk(ListNode<Token>* &token);
+CSTNode* _ampersand(ListNode<Token>* &token);
+CSTNode* _left_bracket(ListNode<Token>* &token);
+CSTNode* _right_bracket(ListNode<Token>* &token);
+CSTNode* _dot(ListNode<Token>* &token);
+CSTNode* _arrow(ListNode<Token>* &token);
 
 // a <-> b <-> c  (next ->, prev <-)
 // let p point to b

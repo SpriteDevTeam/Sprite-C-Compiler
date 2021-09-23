@@ -1,34 +1,16 @@
 #include <iostream>
-#include "AST.h"
+#include "CST.h"
 #include "List.h"
 #include "Token.h"
 
 #define DEBUG 0
 
-ASTNode::ASTNode(int _type, std::string _content) {
+CSTNode::CSTNode(int _type, std::string _content) {
   type = _type;
   content = _content;
 }
 
-ASTNode* build_AST(List<Token>* list) {
-  // roughly check, needs better implementation in the future
-  if (list == nullptr || list->head == nullptr) {
-    std::fprintf(stderr, "AST Error: AST build failed: list is empty\n");
-    exit(1);
-  }
-
-  ListNode<Token>* token = list->head;
-  ASTNode* root = nullptr;
-
-  if ((root = prog(token)) == nullptr || token != nullptr) {
-    std::fprintf(stderr, "AST Error: AST build failed: syntax error\n");
-    exit(1);
-  }
-
-  return root;
-}
-
-ASTNode* prog(ListNode<Token>* &token) {
+CSTNode* prog(ListNode<Token>* &token) {
   INIT(PROG)
   ENTER_INFO(PROG)
   if (token == nullptr) {
@@ -52,7 +34,7 @@ fail:
   FAIL()
 }
 
-ASTNode* decl(ListNode<Token>* &token) {
+CSTNode* decl(ListNode<Token>* &token) {
   INIT(DECL)
   ENTER_INFO(DECL)
 rule1:
@@ -95,7 +77,7 @@ fail:
   FAIL()
 }
 
-ASTNode* arg_list(ListNode<Token>* &token) {
+CSTNode* arg_list(ListNode<Token>* &token) {
   INIT(ARG_LIST)
   ENTER_INFO(ARG_LIST)
 rule1:
@@ -112,7 +94,7 @@ fail:
   FAIL()
 }
 
-ASTNode* enum_list(ListNode<Token>* &token) {
+CSTNode* enum_list(ListNode<Token>* &token) {
   INIT(ENUM_LIST)
   ENTER_INFO(ENUM_LIST)
 rule1:
@@ -135,7 +117,7 @@ fail:
   FAIL()
 }
 
-ASTNode* def(ListNode<Token>* &token) {
+CSTNode* def(ListNode<Token>* &token) {
   INIT(DEF)
   ENTER_INFO(DEF)
 rule1:
@@ -168,7 +150,7 @@ fail:
   FAIL()
 }
 
-ASTNode* mem_decl_list(ListNode<Token>* &token) {
+CSTNode* mem_decl_list(ListNode<Token>* &token) {
   INIT(MEM_DECL_LIST)
   ENTER_INFO(MEM_DECL_LIST)
 rule1:
@@ -186,7 +168,7 @@ fail: // should never reach here
   FAIL()
 }
 
-ASTNode* stmt_list(ListNode<Token>* &token) {
+CSTNode* stmt_list(ListNode<Token>* &token) {
   INIT(STMT_LIST)
   ENTER_INFO(STMT_LIST)
 rule1:
@@ -202,7 +184,7 @@ fail: // should never reach here
   FAIL()
 }
 
-ASTNode* stmt(ListNode<Token>* &token) {
+CSTNode* stmt(ListNode<Token>* &token) {
   INIT(STMT)
   ENTER_INFO(STMT)
 rule1:
@@ -240,7 +222,7 @@ fail:
   FAIL()
 }
 
-ASTNode* simple(ListNode<Token>* &token) {
+CSTNode* simple(ListNode<Token>* &token) {
   INIT(SIMPLE)
   ENTER_INFO(SIMPLE)
 rule1:
@@ -267,58 +249,58 @@ fail:
   FAIL()
 }
 
-ASTNode* assign_op(ListNode<Token>* &token) {
+CSTNode* assign_op(ListNode<Token>* &token) {
   ENTER_INFO(ASSIGN_OP)
 rule1:
   // <assign_op> ::= =
-  TERMINAL_CONTENT_NF("=", rule2, fail)
+  TERMINAL_CONTENT_NF("=", ASSIGN_OP,  rule2, fail)
 rule2:
   // <assign_op> ::= +=
-  TERMINAL_CONTENT_NF("+=", rule3, fail)
+  TERMINAL_CONTENT_NF("+=", ASSIGN_OP, rule3, fail)
 rule3:
   // <assign_op> ::= -=
-  TERMINAL_CONTENT_NF("-=", rule4, fail)
+  TERMINAL_CONTENT_NF("-=", ASSIGN_OP, rule4, fail)
 rule4:
   // <assign_op> ::= *=
-  TERMINAL_CONTENT_NF("*=", rule5, fail)
+  TERMINAL_CONTENT_NF("*=", ASSIGN_OP, rule5, fail)
 rule5:
   // <assign_op> ::= /=
-  TERMINAL_CONTENT_NF("/=", rule6, fail)
+  TERMINAL_CONTENT_NF("/=", ASSIGN_OP, rule6, fail)
 rule6:
   // <assign_op> ::= %=
-  TERMINAL_CONTENT_NF("%=", rule7, fail)
+  TERMINAL_CONTENT_NF("%=", ASSIGN_OP, rule7, fail)
 rule7:
   // <assign_op> ::= <<=
-  TERMINAL_CONTENT_NF("<<=", rule8, fail)
+  TERMINAL_CONTENT_NF("<<=", ASSIGN_OP, rule8, fail)
 rule8:
   // <assign_op> ::= >>=
-  TERMINAL_CONTENT_NF(">>=", rule9, fail)
+  TERMINAL_CONTENT_NF(">>=", ASSIGN_OP, rule9, fail)
 rule9:
   // <assign_op> ::= &=
-  TERMINAL_CONTENT_NF("&=", rule10, fail)
+  TERMINAL_CONTENT_NF("&=", ASSIGN_OP, rule10, fail)
 rule10:
   // <assign_op> ::= ^=
-  TERMINAL_CONTENT_NF("^=", rule11, fail)
+  TERMINAL_CONTENT_NF("^=", ASSIGN_OP, rule11, fail)
 rule11:
   // <assign_op> ::= |=
-  TERMINAL_CONTENT_NF("|=", fail, fail)
+  TERMINAL_CONTENT_NF("|=", ASSIGN_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* postfix_op(ListNode<Token>* &token) {
+CSTNode* postfix_op(ListNode<Token>* &token) {
   ENTER_INFO(POSTFIX_OP)
 rule1:
   // <postfix_op> ::= ++
-  TERMINAL_CONTENT_NF("++", rule2, fail)
+  TERMINAL_CONTENT_NF("++", POSTFIX_OP, rule2, fail)
 rule2:
   // <postfix_op> ::= --
-  TERMINAL_CONTENT_NF("--", fail, fail)
+  TERMINAL_CONTENT_NF("--", POSTFIX_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* if_stmt(ListNode<Token>* &token) {
+CSTNode* if_stmt(ListNode<Token>* &token) {
   INIT(IF_STMT)
   ENTER_INFO(IF_STMT)
 rule1:
@@ -339,7 +321,7 @@ fail:
   FAIL()
 }
 
-ASTNode* for_stmt(ListNode<Token>* &token) {
+CSTNode* for_stmt(ListNode<Token>* &token) {
   INIT(FOR_STMT)
   ENTER_INFO(FOR_STMT)
 rule1:
@@ -359,7 +341,7 @@ fail:
   FAIL()
 }
 
-ASTNode* jump_stmt(ListNode<Token>* &token) {
+CSTNode* jump_stmt(ListNode<Token>* &token) {
   INIT(JUMP_STMT)
   ENTER_INFO(JUMP_STMT)
 rule1:
@@ -377,7 +359,7 @@ fail:
   FAIL()
 }
 
-ASTNode* return_stmt(ListNode<Token>* &token) {
+CSTNode* return_stmt(ListNode<Token>* &token) {
   INIT(RETURN_STMT)
   ENTER_INFO(RETURN_STMT)
 rule1:
@@ -394,7 +376,7 @@ fail:
   FAIL()
 }
 
-ASTNode* type(ListNode<Token>* &token) {
+CSTNode* type(ListNode<Token>* &token) {
   INIT(TYPE)
   ENTER_INFO(TYPE)
 rule1:
@@ -435,7 +417,7 @@ fail:
   FAIL()
 }
 
-ASTNode* expr(ListNode<Token>* &token) {
+CSTNode* expr(ListNode<Token>* &token) {
   INIT(EXPR)
   ENTER_INFO(EXPR)
 rule1:
@@ -452,19 +434,19 @@ fail:
   FAIL()
 }
 
-ASTNode* eq_op(ListNode<Token>* &token) {
+CSTNode* eq_op(ListNode<Token>* &token) {
   ENTER_INFO(EQ_OP)
 rule1:
   // <eq_op> ::= ==
-  TERMINAL_CONTENT_NF("==", rule2, fail)
+  TERMINAL_CONTENT_NF("==", EQ_OP, rule2, fail)
 rule2:
   // <eq_op> ::= !=
-  TERMINAL_CONTENT_NF("!=", fail, fail)
+  TERMINAL_CONTENT_NF("!=", EQ_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* cond_expr(ListNode<Token>* &token) {
+CSTNode* cond_expr(ListNode<Token>* &token) {
   INIT(COND_EXPR)
   ENTER_INFO(COND_EXPR)
 rule1:
@@ -481,25 +463,25 @@ fail:
   FAIL()
 }
 
-ASTNode* cond_op(ListNode<Token>* &token) {
+CSTNode* cond_op(ListNode<Token>* &token) {
   ENTER_INFO(COND_OP)
 rule1:
   // <cond_op> ::= <
-  TERMINAL_CONTENT_NF("<", rule2, fail)
+  TERMINAL_CONTENT_NF("<", COND_OP, rule2, fail)
 rule2:
   // <cond_op> ::= >
-  TERMINAL_CONTENT_NF(">", rule3, fail)
+  TERMINAL_CONTENT_NF(">", COND_OP, rule3, fail)
 rule3:
   // <cond_op> ::= <=
-  TERMINAL_CONTENT_NF("<=", rule4, fail)
+  TERMINAL_CONTENT_NF("<=", COND_OP, rule4, fail)
 rule4:
   // <cond_op> ::= >=
-  TERMINAL_CONTENT_NF(">=", fail, fail)
+  TERMINAL_CONTENT_NF(">=", COND_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* shift_expr(ListNode<Token>* &token) {
+CSTNode* shift_expr(ListNode<Token>* &token) {
   INIT(SHIFT_EXPR)
   ENTER_INFO(SHIFT_EXPR)
 rule1:
@@ -516,19 +498,19 @@ fail:
   FAIL()
 }
 
-ASTNode* shift_op(ListNode<Token>* &token) {
+CSTNode* shift_op(ListNode<Token>* &token) {
   ENTER_INFO(SHIFT_OP)
 rule1:
   // <shift_expr> ::= <<
-  TERMINAL_CONTENT_NF("<<", rule2, fail)
+  TERMINAL_CONTENT_NF("<<", SHIFT_OP, rule2, fail)
 rule2:
   // <shift_expr> ::= >>
-  TERMINAL_CONTENT_NF(">>", fail, fail)
+  TERMINAL_CONTENT_NF(">>", SHIFT_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* add_expr(ListNode<Token>* &token) {
+CSTNode* add_expr(ListNode<Token>* &token) {
   INIT(ADD_EXPR)
   ENTER_INFO(ADD_EXPR)
 rule1:
@@ -545,19 +527,19 @@ fail:
   FAIL()
 }
 
-ASTNode* add_op(ListNode<Token>* &token) {
+CSTNode* add_op(ListNode<Token>* &token) {
   ENTER_INFO(ADD_OP)
 rule1:
   // <add_expr> ::= +
-  TERMINAL_CONTENT_NF("+", rule2, fail)
+  TERMINAL_CONTENT_NF("+", ADD_OP, rule2, fail)
 rule2:
   // <add_expr> ::= -
-  TERMINAL_CONTENT_NF("-", fail, fail)
+  TERMINAL_CONTENT_NF("-", ADD_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* mul_expr(ListNode<Token>* &token) {
+CSTNode* mul_expr(ListNode<Token>* &token) {
   INIT(MUL_EXPR)
   ENTER_INFO(MUL_EXPR)
 rule1:
@@ -574,22 +556,22 @@ fail:
   FAIL()
 }
 
-ASTNode* mul_op(ListNode<Token>* &token) {
+CSTNode* mul_op(ListNode<Token>* &token) {
   ENTER_INFO(MUL_OP)
 rule1:
   // <mul_expr> ::= *
-  TERMINAL_CONTENT_NF("*", rule2, fail)
+  TERMINAL_CONTENT_NF("*", MUL_OP, rule2, fail)
 rule2:
   // <mul_expr> ::= /
-  TERMINAL_CONTENT_NF("/", rule3, fail)
+  TERMINAL_CONTENT_NF("/", MUL_OP, rule3, fail)
 rule3:
   // <mul_expr> ::= %
-  TERMINAL_CONTENT_NF("%", fail, fail)
+  TERMINAL_CONTENT_NF("%", MUL_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* unary_expr(ListNode<Token>* &token) {
+CSTNode* unary_expr(ListNode<Token>* &token) {
   INIT(UNARY_EXPR)
   ENTER_INFO(UNARY_EXPR)
 rule1:
@@ -606,25 +588,25 @@ fail:
   FAIL()
 }
 
-ASTNode* unary_op(ListNode<Token>* &token) {
+CSTNode* unary_op(ListNode<Token>* &token) {
   ENTER_INFO(UNARY_OP)
 rule1:
   // <unary_expr> ::= +
-  TERMINAL_CONTENT_NF("+", rule2, fail)
+  TERMINAL_CONTENT_NF("+", UNARY_OP, rule2, fail)
 rule2:
   // <unary_expr> ::= -
-  TERMINAL_CONTENT_NF("-", rule3, fail)
+  TERMINAL_CONTENT_NF("-", UNARY_OP, rule3, fail)
 rule3:
   // <unary_expr> ::= !
-  TERMINAL_CONTENT_NF("!", rule4, fail)
+  TERMINAL_CONTENT_NF("!", UNARY_OP, rule4, fail)
 rule4:
   // <unary_expr> ::= ~
-  TERMINAL_CONTENT_NF("~", fail, fail)
+  TERMINAL_CONTENT_NF("~", UNARY_OP, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* term(ListNode<Token>* &token) {
+CSTNode* term(ListNode<Token>* &token) {
   INIT(TERM)
   ENTER_INFO(TERM)
 rule1:
@@ -674,37 +656,37 @@ fail:
   FAIL()
 }
 
-ASTNode* keyword_func(ListNode<Token>* &token) {
+CSTNode* keyword_func(ListNode<Token>* &token) {
   ENTER_INFO(KEYWORD_FUNC)
 rule1:
   // <keyword_func> ::= printf
-  TERMINAL_CONTENT_NF("printf", rule2, fail)
+  TERMINAL_CONTENT_NF("printf", KEYWORD_FUNC, rule2, fail)
 rule2:
   // <keyword_func> ::= scanf
-  TERMINAL_CONTENT_NF("scanf", rule3, fail)
+  TERMINAL_CONTENT_NF("scanf", KEYWORD_FUNC, rule3, fail)
 rule3:
   // <keyword_func> ::= open
-  TERMINAL_CONTENT_NF("open", rule4, fail)
+  TERMINAL_CONTENT_NF("open", KEYWORD_FUNC, rule4, fail)
 rule4:
   // <keyword_func> ::= close
-  TERMINAL_CONTENT_NF("close", rule5, fail)
+  TERMINAL_CONTENT_NF("close", KEYWORD_FUNC, rule5, fail)
 rule5:
   // <keyword_func> ::= read
-  TERMINAL_CONTENT_NF("read", rule6, fail)
+  TERMINAL_CONTENT_NF("read", KEYWORD_FUNC, rule6, fail)
 rule6:
   // <keyword_func> ::= write
-  TERMINAL_CONTENT_NF("write", rule7, fail)
+  TERMINAL_CONTENT_NF("write", KEYWORD_FUNC, rule7, fail)
 rule7:
   // <keyword_func> ::= malloc
-  TERMINAL_CONTENT_NF("malloc", rule8, fail)
+  TERMINAL_CONTENT_NF("malloc", KEYWORD_FUNC, rule8, fail)
 rule8:
   // <keyword_func> ::= free
-  TERMINAL_CONTENT_NF("free", fail, fail)
+  TERMINAL_CONTENT_NF("free", KEYWORD_FUNC, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* lvalue(ListNode<Token>* &token) {
+CSTNode* lvalue(ListNode<Token>* &token) {
   INIT(LVALUE)
   ENTER_INFO(LVALUE)
 rule1:
@@ -738,7 +720,7 @@ fail:
   FAIL()
 }
 
-ASTNode* entity(ListNode<Token>* &token) {
+CSTNode* entity(ListNode<Token>* &token) {
   INIT(ENTITY)
   ENTER_INFO(ENTITY)
 rule1:
@@ -759,7 +741,7 @@ fail:
   FAIL()
 }
 
-ASTNode* para_list(ListNode<Token>* &token) {
+CSTNode* para_list(ListNode<Token>* &token) {
   INIT(PARA_LIST)
   ENTER_INFO(PARA_LIST)
 rule1:
@@ -776,203 +758,203 @@ fail:
   FAIL()
 }
 
-ASTNode* id(ListNode<Token>* &token) {
+CSTNode* id(ListNode<Token>* &token) {
   ENTER_INFO(ID)
   TERMINAL_TYPE_NF(ID, ID, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* number(ListNode<Token>* &token) {
+CSTNode* number(ListNode<Token>* &token) {
   ENTER_INFO(NUMBER)
   TERMINAL_TYPE_NF(NUMBER, NUMBER, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* char_lit(ListNode<Token>* &token) {
+CSTNode* char_lit(ListNode<Token>* &token) {
   ENTER_INFO(CHAR_LIT)
   TERMINAL_TYPE_NF(CHAR_LIT, CHAR_LIT, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* string_lit(ListNode<Token>* &token) {
+CSTNode* string_lit(ListNode<Token>* &token) {
   ENTER_INFO(STRING_LIT)
   TERMINAL_TYPE_NF(STRING_LIT, STRING_LIT, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _left_paren(ListNode<Token>* &token) {
+CSTNode* _left_paren(ListNode<Token>* &token) {
   ENTER_INFO(_LEFT_PAREN)
-  TERMINAL_CONTENT_NF("(", fail, fail)
+  TERMINAL_CONTENT_NF("(", _LEFT_PAREN, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _right_paren(ListNode<Token>* &token) {
+CSTNode* _right_paren(ListNode<Token>* &token) {
   ENTER_INFO(_RIGHT_PAREN)
-  TERMINAL_CONTENT_NF(")", fail, fail)
+  TERMINAL_CONTENT_NF(")", _RIGHT_PAREN, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _semicolon(ListNode<Token>* &token) {
+CSTNode* _semicolon(ListNode<Token>* &token) {
   ENTER_INFO(_SEMICOLON)
-  TERMINAL_CONTENT_NO_CHECK_N(";", fail)
+  TERMINAL_CONTENT_NO_CHECK_N(";", _SEMICOLON, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _equals(ListNode<Token>* &token) {
+CSTNode* _equals(ListNode<Token>* &token) {
   ENTER_INFO(_EQUALS)
-  TERMINAL_CONTENT_NF("=", fail, fail)
+  TERMINAL_CONTENT_NF("=", _EQUALS, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _struct(ListNode<Token>* &token) {
+CSTNode* _struct(ListNode<Token>* &token) {
   ENTER_INFO(_STRUCT)
-  TERMINAL_CONTENT_NF("struct", fail, fail)
+  TERMINAL_CONTENT_NF("struct", _STRUCT, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _enum(ListNode<Token>* &token) {
+CSTNode* _enum(ListNode<Token>* &token) {
   ENTER_INFO(_ENUM)
-  TERMINAL_CONTENT_NF("enum", fail, fail)
+  TERMINAL_CONTENT_NF("enum", _ENUM, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _left_brace(ListNode<Token>* &token) {
+CSTNode* _left_brace(ListNode<Token>* &token) {
   ENTER_INFO(_LEFT_BRACE)
-  TERMINAL_CONTENT_NF("{", fail, fail)
+  TERMINAL_CONTENT_NF("{", _LEFT_BRACE, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _right_brace(ListNode<Token>* &token) {
+CSTNode* _right_brace(ListNode<Token>* &token) {
   ENTER_INFO(_RIGHT_BRACE)
-  TERMINAL_CONTENT_NO_CHECK_N("}", fail)
+  TERMINAL_CONTENT_NO_CHECK_N("}", _RIGHT_BRACE, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _comma(ListNode<Token>* &token) {
+CSTNode* _comma(ListNode<Token>* &token) {
   ENTER_INFO(_COMMA)
-  TERMINAL_CONTENT_NF(",", fail, fail)
+  TERMINAL_CONTENT_NF(",", _COMMA, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _epsilon(ListNode<Token>* &token) {
+CSTNode* _epsilon(ListNode<Token>* &token) {
   ENTER_INFO(_EPSILON)
-  return new ASTNode(_EPSILON, "");
+  return new CSTNode(_EPSILON, "");
 }
 
-ASTNode* _if(ListNode<Token>* &token) {
+CSTNode* _if(ListNode<Token>* &token) {
   ENTER_INFO(_IF)
-  TERMINAL_CONTENT_NF("if", fail, fail)
+  TERMINAL_CONTENT_NF("if", _IF, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _else(ListNode<Token>* &token) {
+CSTNode* _else(ListNode<Token>* &token) {
   ENTER_INFO(_ELSE)
-  TERMINAL_CONTENT_NF("else", fail, fail)
+  TERMINAL_CONTENT_NF("else", _ELSE, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _for(ListNode<Token>* &token) {
+CSTNode* _for(ListNode<Token>* &token) {
   ENTER_INFO(_FOR)
-  TERMINAL_CONTENT_NF("for", fail, fail)
+  TERMINAL_CONTENT_NF("for", _FOR, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _break(ListNode<Token>* &token) {
+CSTNode* _break(ListNode<Token>* &token) {
   ENTER_INFO(_BREAK)
-  TERMINAL_CONTENT_NF("break", fail, fail)
+  TERMINAL_CONTENT_NF("break", _BREAK, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _continue(ListNode<Token>* &token) {
+CSTNode* _continue(ListNode<Token>* &token) {
   ENTER_INFO(_CONTINUE)
-  TERMINAL_CONTENT_NF("continue", fail, fail)
+  TERMINAL_CONTENT_NF("continue", _CONTINUE, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _return(ListNode<Token>* &token) {
+CSTNode* _return(ListNode<Token>* &token) {
   ENTER_INFO(_RETURN)
-  TERMINAL_CONTENT_NF("return", fail, fail)
+  TERMINAL_CONTENT_NF("return", _RETURN, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _int(ListNode<Token>* &token) {
+CSTNode* _int(ListNode<Token>* &token) {
   ENTER_INFO(_INT)
-  TERMINAL_CONTENT_NF("int", fail, fail)
+  TERMINAL_CONTENT_NF("int", _INT, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _char(ListNode<Token>* &token) {
+CSTNode* _char(ListNode<Token>* &token) {
   ENTER_INFO(_CHAR)
-  TERMINAL_CONTENT_NF("char", fail, fail)
+  TERMINAL_CONTENT_NF("char", _CHAR, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _void(ListNode<Token>* &token) {
+CSTNode* _void(ListNode<Token>* &token) {
   ENTER_INFO(_VOID)
-  TERMINAL_CONTENT_NF("void", fail, fail)
+  TERMINAL_CONTENT_NF("void", _VOID, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _asterisk(ListNode<Token>* &token) {
+CSTNode* _asterisk(ListNode<Token>* &token) {
   ENTER_INFO(_ASTERISK)
-  TERMINAL_CONTENT_NF("*", fail, fail)
+  TERMINAL_CONTENT_NF("*", _ASTERISK, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _ampersand(ListNode<Token>* &token) {
+CSTNode* _ampersand(ListNode<Token>* &token) {
   ENTER_INFO(_AMPERSAND)
-  TERMINAL_CONTENT_NF("&", fail, fail)
+  TERMINAL_CONTENT_NF("&", _AMPERSAND, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _left_bracket(ListNode<Token>* &token) {
+CSTNode* _left_bracket(ListNode<Token>* &token) {
   ENTER_INFO(_LEFT_BRACKET)
-  TERMINAL_CONTENT_NF("[", fail, fail)
+  TERMINAL_CONTENT_NF("[", _LEFT_BRACKET, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _right_bracket(ListNode<Token>* &token) {
+CSTNode* _right_bracket(ListNode<Token>* &token) {
   ENTER_INFO(_RIGHT_BRACKET)
-  TERMINAL_CONTENT_NF("]", fail, fail)
+  TERMINAL_CONTENT_NF("]", _RIGHT_BRACKET, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _dot(ListNode<Token>* &token) {
+CSTNode* _dot(ListNode<Token>* &token) {
   ENTER_INFO(_DOT)
-  TERMINAL_CONTENT_NF(".", fail, fail)
+  TERMINAL_CONTENT_NF(".", _DOT, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
 
-ASTNode* _arrow(ListNode<Token>* &token) {
+CSTNode* _arrow(ListNode<Token>* &token) {
   ENTER_INFO(_ARROW)
-  TERMINAL_CONTENT_NF("->", fail, fail)
+  TERMINAL_CONTENT_NF("->", _ARROW, fail, fail)
 fail:
   TERMINAL_FAIL()
 }
