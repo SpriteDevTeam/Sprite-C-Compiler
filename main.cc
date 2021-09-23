@@ -1,9 +1,10 @@
 #include <fstream>
 #include <string>
-#include "List"
+#include "CST.h"
+#include "List.h"
+#include "Parser.h"
 #include "Scanner.h"
 #include "Token.h"
-#include "AST.h"
 
 int main(int argc, char* argv[]) {
   // maybe some checks to argc and argv
@@ -20,10 +21,13 @@ int main(int argc, char* argv[]) {
 
   //list->display();
 
-  build_AST(list);
+  CSTNode* root = build_CST(list);
 
   std::printf("Parsing succeed.\n");
 
+  display_CST(root);
+
+  destruct_CST(root);
   delete list;
   return 0;
 }
