@@ -393,7 +393,19 @@ CSTNode* _arrow(ListNode<Token>* &token);
 // let p point to b
 //     token_forward(p): p points to c
 //     token_backward(p): p points to a
+
 bool token_forward(ListNode<Token>* &token);
 bool token_backward(ListNode<Token>* &token);
+
+CSTNode* build_CST(List<Token>* list);
+void graft_CST(CSTNode* node);
+void flatten_CST(CSTNode* node);
+void fix_CST(CSTNode* node);
+void trim_CST(CSTNode* node);
+void destruct_CST(CSTNode* node);
+void display_CST(CSTNode* node);
+
+CSTNode* _graft_CST(CSTNode* node);
+void _display_CST(CSTNode* node, std::string prefix, bool is_the_last);
 
 #endif

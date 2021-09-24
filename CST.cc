@@ -5,6 +5,8 @@
 
 #define DEBUG 0
 
+ListNode<Token>* error_token = nullptr;
+
 CSTNode::CSTNode(int _type, std::string _content) {
   type = _type;
   content = _content;
@@ -963,6 +965,7 @@ bool token_forward(ListNode<Token>* &token) {
   if (token == nullptr) {
     return false;
   }
+  error_token = token;
   token = token->next;
   return true;
 }
@@ -973,4 +976,589 @@ bool token_backward(ListNode<Token>* &token) {
   }
   token = token->prev;
   return true;
+}
+
+CSTNode* build_CST(List<Token>* list) {
+  // roughly check, needs better implementation in the future
+  if (list == nullptr || list->head == nullptr) {
+    std::fprintf(stderr, "AST Error: AST build failed: list is empty\n");
+    exit(1);
+  }
+
+  ListNode<Token>* token = list->head;
+  CSTNode* root = nullptr;
+
+  if ((root = prog(token)) == nullptr || token != nullptr) {
+    std::fprintf(
+      stderr,
+      "AST Error: AST build failed: syntax error near line %d, colunm %d\n",
+      error_token->data->line,
+      error_token->data->column
+    );
+    exit(1);
+  }
+
+  return root;
+}
+
+void graft_CST(CSTNode* node) {
+  // general cases:
+  //
+  // +- <rule1>
+  //    +- <rule2>                       +- <rule1>
+  //       +- <rule3>   => graft_CST() =>   +- <rule4>
+  //          +- <rule4>                    +- <rule5>
+  //          +- <rule5>
+  //
+  // specical case: <expr> and <stmt>
+  //   Since <expr> and <stmt> are important in further processing, I don't
+  //   remove it while grafting.
+  //
+  // +- <rule1>                      +- <rule1>
+  //    +- <expr>   => graft_CST() =>   +- <expr>
+  //       + <rule2>                       +- <rule2>
+  if (node->children.size() == 1 && node->children[0]->type != EXPR && node->children[0]->type != STMT) {
+    CSTNode* temp = _graft_CST(node->children[0]);
+
+    if (temp->children.size() == 0) {
+      CSTNode* new_temp = new CSTNode(temp->type, temp->content);
+      destruct_CST(node->children[0]);
+      node->children[0] = new_temp;
+    }
+    else {
+      for (int i = temp->children.size() - 1; i >= 0; i--) {
+        node->children.insert(node->children.begin() + 1, temp->children[i]);
+      }
+      temp->children.clear();
+      destruct_CST(node->children[0]);
+      node->children.erase(node->children.begin());
+    }
+  }
+
+  for (auto i : node->children) {
+    graft_CST(i);
+  }
+}
+
+void flatten_CST(CSTNode* node) {
+  for (auto i : node->children) {
+    flatten_CST(i);
+  }
+
+  // case 1: <prog>, <mem_decl_list>, and <stmt_list>
+  //
+  // +- <prog>
+  //    +- <def>                           +- <prog>
+  //    +- <prog>       => flatten_CST() =>   +- <def>
+  //       +- <decl>                          +- <decl>
+  //       +- <prog>
+  //          +- <_epsilon>
+  if (node->type == PROG ||
+      node->type == MEM_DECL_LIST ||
+      node->type == STMT_LIST) {
+    if (node->children.size() > 1 &&
+        (node->children.back()->type == PROG ||
+         node->children.back()->type == MEM_DECL_LIST ||
+         node->children.back()->type == STMT_LIST)) {
+      CSTNode* temp = node->children.back();
+      node->children.pop_back();
+      for (auto &i : temp->children) {
+        node->children.push_back(i);
+      }
+      delete temp;
+    }
+    else if (node->children.back()->type == PROG ||
+             node->children.back()->type == MEM_DECL_LIST ||
+             node->children.back()->type == STMT_LIST ||
+             node->children.back()->type == _EPSILON){
+      delete node->children[0];
+      node->children.pop_back();
+    }
+  }
+  // case 2: <enum_list>
+  //
+  // +- <enum_list>                      +- <enum_list>
+  //    +- <id>                             +- <id>
+  //    +- <comma>    => flatten_CST() =>   +- <comma>
+  //    +- <enum_list>                      +- <id>
+  //       +- <id>
+  else if (node->type == ENUM_LIST) {
+    if (node->children.size() > 1) {
+      CSTNode* temp = node->children.back();
+      node->children.pop_back();
+      for (auto &i : temp->children) {
+        node->children.push_back(i);
+      }
+      delete temp;
+    }
+  }
+  // case 3: rules which are right-recursive (except <unary_expr>)
+  //   condition 1:
+  //
+  //   +- <mul_expr>                          +- <mul_expr>
+  //      +- <unary_expr>                        +- <unary_expr>
+  //      +- <mul_op>      => flatten_CST() =>   +- <mul_op>
+  //      +- <mul_expr>                          +- <unary_expr>
+  //         +- <unary_expr>
+  //
+  //    condition 2:
+  //      The program works fine without this condition, why did I write it?
+  else if (node->type == EXPR ||
+           node->type == COND_EXPR ||
+           node->type == SHIFT_EXPR ||
+           node->type == ADD_EXPR ||
+           node->type == MUL_EXPR ||
+           node->type == ARG_LIST ||
+           node->type == PARA_LIST) {
+    if (node->children.size() > 0 && node->children.back()->type == node->type) {
+      CSTNode* temp = node->children.back();
+      node->children.pop_back();
+      for (auto &i : temp->children) {
+        node->children.push_back(i);
+      }
+      delete temp;
+    }
+    // else if (node->children.size() > 0 &&
+    //          node->children.back()->children.size() > 0 &&
+    //          node->children[0]->type != UNARY_OP &&
+    //          node->children[0]->type == node->children.back()->children[0]->type) {
+    //   CSTNode* temp = node->children.back();
+    //   node->children.pop_back();
+    //   for (auto &i : temp->children) {
+    //     node->children.push_back(i);
+    //   }
+    //   delete temp;
+    // }
+  }
+  // case 4: expression-related nodes
+  //   I think this case is no longer needed, but I leave it here just in case.
+  // if (node->type == EXPR ||
+  //     node->type == COND_EXPR ||
+  //     node->type == SHIFT_EXPR ||
+  //     node->type == ADD_EXPR ||
+  //     node->type == MUL_EXPR ||
+  //     node->type == UNARY_EXPR) {
+  //   for (int i = 0; i < int(node->children.size()); i++) {
+  //     if (node->children[i]->children.size() == 1 && (node->children[i]->children[0]->type == ID || node->children[i]->children[0]->type == NUMBER)) {
+  //       CSTNode* temp = node->children[i];
+  //       node->children[i] = temp->children[0];
+  //       delete temp;
+  //     }
+  //   }
+  // }
+}
+
+void fix_CST(CSTNode* node) {
+  for (auto i : node->children) {
+    fix_CST(i);
+  }
+
+  // case 1: <type>
+  //    Let <type> node contains the message directly.
+  //
+  // +- <type>
+  //    +- <_struct>  => fix_CST() => +- <type>
+  //    +- <id>
+  //    +- <_asterisk>
+  if (node->type == TYPE) {
+    if (node->children.size() == 1) {
+      node->content = node->children[0]->content;
+      delete node->children.back();
+      node->children.pop_back();
+    }
+    else if (node->children.size() == 2){
+      node->content = node->children[0]->content + " " + node->children[1]->content;
+      delete node->children.back();
+      node->children.pop_back();
+      delete node->children.back();
+      node->children.pop_back();
+    }
+    else {
+      node->content = node->children[0]->content + " " + node->children[1]->content + " " + node->children[2]->content;
+      delete node->children.back();
+      node->children.pop_back();
+      delete node->children.back();
+      node->children.pop_back();
+      delete node->children.back();
+      node->children.pop_back();
+    }
+  }
+
+  // case 2: expression-related nodes
+  //    Since CST is generated, there's no need to distinguish them, so I rename them.
+  if (node->type == COND_EXPR ||
+      node->type == SHIFT_EXPR ||
+      node->type == ADD_EXPR ||
+      node->type == MUL_EXPR ||
+      node->type == UNARY_EXPR) {
+    node->type = EXPR;
+  }
+
+  // case 3: <_equals>
+  if (node->type == _EQUALS) {
+    node->type = ASSIGN_OP;
+  }
+
+  // case 4: <mul_expr>
+  //   Okay, this is a little difficult to explain, but this is not needed now.
+  // if (node->children.size() > 3 &&
+  //     node->children[node->children.size() - 2]->type == UNARY_OP &&
+  //     node->children[node->children.size() - 3]->type == MUL_OP) {
+  //   CSTNode* temp = new CSTNode(EXPR, "");
+  //   temp->children.push_back(node->children[node->children.size() - 2]);
+  //   temp->children.push_back(node->children[node->children.size() - 1]);
+  //   node->children[node->children.size() - 2] = temp;
+  //   node->children.pop_back();
+  // }
+
+  // case 5: <number> and <id>
+  //   This is used to fix some errors caused by the fourth case in
+  //   flatten_CST(), since that case is no longer reachable, this case is
+  //   naturally commented out.
+  //
+  // +- <number> => fix_CST() => +- <expr>
+  //                                +- <number>
+  // if (node->type == EXPR && node->children.size() > 1) {
+  //   for (int i = 0; i < int(node->children.size()); i++) {
+  //     if (node->children[i]->type == NUMBER || node->children[i]->type == ID) {
+  //       CSTNode* temp = new CSTNode(EXPR, "");
+  //       temp->children.push_back(node->children[i]);
+  //       node->children[i] = temp;
+  //     }
+  //   }
+  // }
+
+  // case 6: <expr> and <lvalue>
+  //    Note that fix_CST() is used after grift_CST(), and thus the following
+  //    example is not wrong.
+  //
+  // +- <expr1>
+  //    +- <_left_paren>
+  //    +- <expr2>       => fix_CST() => +- <expr1>
+  //       +- <number>                      +- <number>
+  //    +- <_right_paren>
+  if (node->type == EXPR || node->type == LVALUE) {
+    if (node->children[0]->type == _LEFT_PAREN &&
+        node->children[1]->type == node->type &&
+        node->children[2]->type == _RIGHT_PAREN) {
+      CSTNode* temp = node->children[1];
+      delete node->children[0];
+      delete node->children[2];
+      node->children.clear();
+      node->children = temp->children;
+      delete temp;
+    }
+  }
+}
+
+void trim_CST(CSTNode* node) {
+  // remove unnecessary node
+  for (int i = node->children.size() - 1; i >= 0; i--) {
+    CSTNode* temp = node->children[i];
+    if (temp->type == _LEFT_PAREN ||
+        temp->type == _RIGHT_PAREN ||
+        // temp->type == _LEFT_BRACE ||
+        // temp->type == _RIGHT_BRACE ||
+        // temp->type == _LEFT_BRACKET ||
+        // temp->type == _RIGHT_BRACKET ||
+        temp->type == _COMMA ||
+        temp->type == _SEMICOLON) {
+      delete node->children[i];
+      node->children.erase(node->children.begin() + i);
+    }
+  }
+  for (auto i : node->children) {
+    trim_CST(i);
+  }
+}
+
+CSTNode* _graft_CST(CSTNode* node) {
+  if (node->children.size() == 1) {
+    return _graft_CST(node->children[0]);
+  }
+  else {
+    return node;
+  }
+}
+
+void destruct_CST(CSTNode* node) {
+  for (auto &i : node->children) {
+    destruct_CST(i);
+  }
+  delete node;
+}
+
+void display_CST(CSTNode* node) {
+  _display_CST(node, "", true);
+}
+
+void _display_CST(CSTNode* node, std::string prefix, bool is_the_last) {
+  // modify from: https://stackoverflow.com/a/8567550
+  switch (node->type) {
+    case TOKEN: {
+      std::cout << prefix << "+- <token> ==> " << node->content << std::endl;
+      break;
+    }
+    case PROG: {
+      std::cout << prefix << "+- <prog>" << std::endl;
+      break;
+    }
+    case DECL: {
+      std::cout << prefix << "+- <decl>" << std::endl;
+      break;
+    }
+    case ARG_LIST: {
+      std::cout << prefix << "+- <arg_list>" << std::endl;
+      break;
+    }
+    case ENUM_LIST: {
+      std::cout << prefix << "+- <enum_list>" << std::endl;
+      break;
+    }
+    case DEF: {
+      std::cout << prefix << "+- <def>" << std::endl;
+      break;
+    }
+    case MEM_DECL_LIST: {
+      std::cout << prefix << "+- <mem_decl_list>" << std::endl;
+      break;
+    }
+    case STMT_LIST: {
+      std::cout << prefix << "+- <stmt_list>" << std::endl;
+      break;
+    }
+    case STMT: {
+      std::cout << prefix << "+- <stmt>" << std::endl;
+      break;
+    }
+    case SIMPLE: {
+      std::cout << prefix << "+- <simple>" << std::endl;
+      break;
+    }
+    case ASSIGN_OP: {
+      std::cout << prefix << "+- <assign_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case POSTFIX_OP: {
+      std::cout << prefix << "+- <postfix_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case IF_STMT: {
+      std::cout << prefix << "+- <if_stmt>" << std::endl;
+      break;
+    }
+    case FOR_STMT: {
+      std::cout << prefix << "+- <for_stmt>" << std::endl;
+      break;
+    }
+    case JUMP_STMT: {
+      std::cout << prefix << "+- <jump_stmt>" << std::endl;
+      break;
+    }
+    case RETURN_STMT: {
+      std::cout << prefix << "+- <return_stmt>" << std::endl;
+      break;
+    }
+    case TYPE: {
+      if (node->content != "") {
+        std::cout << prefix << "+- <type> ==> " << node->content << std::endl;
+      }
+      else {
+        std::cout << prefix << "+- <type>" << std::endl;
+      }
+      break;
+    }
+    case EXPR: {
+      std::cout << prefix << "+- <expr>" << std::endl;
+      break;
+    }
+    case EQ_OP: {
+      std::cout << prefix << "+- <eq_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case COND_EXPR: {
+      std::cout << prefix << "+- <cond_expr>" << std::endl;
+      break;
+    }
+    case COND_OP: {
+      std::cout << prefix << "+- <cond_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case SHIFT_EXPR: {
+      std::cout << prefix << "+- <shift_expr>" << std::endl;
+      break;
+    }
+    case SHIFT_OP: {
+      std::cout << prefix << "+- <shift_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case ADD_EXPR: {
+      std::cout << prefix << "+- <add_expr>" << std::endl;
+      break;
+    }
+    case ADD_OP: {
+      std::cout << prefix << "+- <add_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case MUL_EXPR: {
+      std::cout << prefix << "+- <mul_expr>" << std::endl;
+      break;
+    }
+    case MUL_OP: {
+      std::cout << prefix << "+- <mul_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case UNARY_EXPR: {
+      std::cout << prefix << "+- <unary_expr>" << std::endl;
+      break;
+    }
+    case UNARY_OP: {
+      std::cout << prefix << "+- <unary_op> ==> " << node->content << std::endl;
+      break;
+    }
+    case TERM: {
+      std::cout << prefix << "+- <term>" << std::endl;
+      break;
+    }
+    case KEYWORD_FUNC: {
+      std::cout << prefix << "+- <keyword_func> ==> " << node->content << std::endl;
+      break;
+    }
+    case LVALUE: {
+      std::cout << prefix << "+- <lvalue>" << std::endl;
+      break;
+    }
+    case ENTITY: {
+      std::cout << prefix << "+- <entity>" << std::endl;
+      break;
+    }
+    case PARA_LIST: {
+      std::cout << prefix << "+- <para_list>" << std::endl;
+      break;
+    }
+    case ID: {
+      std::cout << prefix << "+- <id> ==> " << node->content << std::endl;
+      break;
+    }
+    case NUMBER: {
+      std::cout << prefix << "+- <number> ==> " << node->content << std::endl;
+      break;
+    }
+    case CHAR_LIT: {
+      std::cout << prefix << "+- <char_lit> ==> " << node->content << std::endl;
+      break;
+    }
+    case STRING_LIT: {
+      std::cout << prefix << "+- <string_lit> ==> " << node->content << std::endl;
+      break;
+    }
+    case _LEFT_PAREN: {
+      std::cout << prefix << "+- <_left_paren> ==> " << node->content << std::endl;
+      break;
+    }
+    case _RIGHT_PAREN: {
+      std::cout << prefix << "+- <_right_paren> ==> " << node->content << std::endl;
+      break;
+    }
+    case _SEMICOLON: {
+      std::cout << prefix << "+- <_semicolon> ==> " << node->content << std::endl;
+      break;
+    }
+    case _EQUALS: {
+      std::cout << prefix << "+- <_equals> ==> " << node->content << std::endl;
+      break;
+    }
+    case _STRUCT: {
+      std::cout << prefix << "+- <_struct> ==> " << node->content << std::endl;
+      break;
+    }
+    case _ENUM: {
+      std::cout << prefix << "+- <_enum> ==> " << node->content << std::endl;
+      break;
+    }
+    case _LEFT_BRACE: {
+      std::cout << prefix << "+- <_left_brace> ==> " << node->content << std::endl;
+      break;
+    }
+    case _RIGHT_BRACE: {
+      std::cout << prefix << "+- <_right_brace> ==> " << node->content << std::endl;
+      break;
+    }
+    case _COMMA: {
+      std::cout << prefix << "+- <_comma> ==> " << node->content << std::endl;
+      break;
+    }
+    case _EPSILON: {
+      std::cout << prefix << "+- <_epsilon> ==> " << node->content << std::endl;
+      break;
+    }
+    case _IF: {
+      std::cout << prefix << "+- <_if> ==> " << node->content << std::endl;
+      break;
+    }
+    case _ELSE: {
+      std::cout << prefix << "+- <_else> ==> " << node->content << std::endl;
+      break;
+    }
+    case _FOR: {
+      std::cout << prefix << "+- <_for> ==> " << node->content << std::endl;
+      break;
+    }
+    case _BREAK: {
+      std::cout << prefix << "+- <_break> ==> " << node->content << std::endl;
+      break;
+    }
+    case _CONTINUE: {
+      std::cout << prefix << "+- <_continue> ==> " << node->content << std::endl;
+      break;
+    }
+    case _RETURN: {
+      std::cout << prefix << "+- <_return> ==> " << node->content << std::endl;
+      break;
+    }
+    case _INT: {
+      std::cout << prefix << "+- <_int> ==> " << node->content << std::endl;
+      break;
+    }
+    case _CHAR: {
+      std::cout << prefix << "+- <_char> ==> " << node->content << std::endl;
+      break;
+    }
+    case _VOID: {
+      std::cout << prefix << "+- <_void> ==> " << node->content << std::endl;
+      break;
+    }
+    case _ASTERISK: {
+      std::cout << prefix << "+- <_asterisk> ==> " << node->content << std::endl;
+      break;
+    }
+    case _AMPERSAND: {
+      std::cout << prefix << "+- <_ampersand> ==> " << node->content << std::endl;
+      break;
+    }
+    case _LEFT_BRACKET: {
+      std::cout << prefix << "+- <_left_bracket> ==> " << node->content << std::endl;
+      break;
+    }
+    case _RIGHT_BRACKET: {
+      std::cout << prefix << "+- <_right_bracket> ==> " << node->content << std::endl;
+      break;
+    }
+    case _DOT: {
+      std::cout << prefix << "+- <_dot> ==> " << node->content << std::endl;
+      break;
+    }
+    case _ARROW: {
+      std::cout << prefix << "+- <_arrow> ==> " << node->content << std::endl;
+      break;
+    }
+    default: {
+      std::cout << prefix << "+- <unknown>" << std::endl;
+    }
+  }
+  prefix += is_the_last ? "   " : "|  ";
+  int length = node->children.size();
+  for (int i = 0; i < length; i++) {
+    _display_CST(node->children[i], prefix, i == length-1);
+  }
 }

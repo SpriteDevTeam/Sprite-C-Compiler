@@ -9,11 +9,4 @@
 
 void parser(List<Token>* list);
 
-CSTNode* build_CST(List<Token>* list);
-void destruct_CST(CSTNode* node);
-
-void display_CST(CSTNode* node);
-
-void _display_CST(CSTNode* node, std::string prefix, bool is_the_last);
-
 #endif

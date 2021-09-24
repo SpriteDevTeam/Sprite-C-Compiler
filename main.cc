@@ -25,6 +25,23 @@ int main(int argc, char* argv[]) {
 
   std::printf("Parsing succeed.\n");
 
+  // std::cout << "\n--- Original CST ---" << std::endl << std::endl;
+  // display_CST(root);
+
+  flatten_CST(root);
+  // std::cout << "\n--- Flattened CST ---" << std::endl << std::endl;
+  // display_CST(root);
+
+  graft_CST(root);
+  // std::cout << "\n--- Grafted CST ---" << std::endl << std::endl;
+  // display_CST(root);
+
+  fix_CST(root);
+  // std::cout << "\n--- Fix left-associative CST ---" << std::endl << std::endl;
+  // display_CST(root);
+
+  trim_CST(root);
+  std::cout << "\n--- Trimmed CST ---" << std::endl << std::endl;
   display_CST(root);
 
   destruct_CST(root);
