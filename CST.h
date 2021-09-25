@@ -74,11 +74,11 @@
 //          | <decl> <prog>
 //          | <def> <prog>
 //
-// <decl> ::= <type> <id> ( ) ;
+// <decl> ::= struct <id> ;
+//          | <type> <id> ( ) ;
 //          | <type> <id> ( <arg_list> ) ;
 //          | <type> <id> ;
 //          | <type> <id> = <expr> ;
-//          | struct <id> ;
 //          | enum { <enum_list> } ;
 //
 // <arg_list> ::= <type> <id>

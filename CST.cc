@@ -40,30 +40,30 @@ CSTNode* decl(ListNode<Token>* &token) {
   INIT(DECL)
   ENTER_INFO(DECL)
 rule1:
-  // <decl> ::= <type> <id> ( ) ;
-  NONTERMINAL_N(type, rule5)
+  // <decl> ::= struct <id> ;
+  RESTORE()
+  NONTERMINAL_N(_struct, rule2)
   NONTERMINAL_N(id, fail)
-  NONTERMINAL_N(_left_paren, rule3)
-  NONTERMINAL_N(_right_paren, rule2)
   NONTERMINAL_NS(_semicolon, fail, success)
 rule2:
+  // <decl> ::= <type> <id> ( ) ;
+  NONTERMINAL_N(type, rule6)
+  NONTERMINAL_N(id, fail)
+  NONTERMINAL_N(_left_paren, rule4)
+  NONTERMINAL_N(_right_paren, rule3)
+  NONTERMINAL_NS(_semicolon, fail, success)
+rule3:
   // <decl> ::= <type> <id> ( <arg_list> ) ;
   NONTERMINAL_N(arg_list, fail)
   NONTERMINAL_N(_right_paren, fail)
   NONTERMINAL_NS(_semicolon, fail, success)
-rule3:
-  // <decl> ::= <type> <id> ;
-  NONTERMINAL_NS(_semicolon, rule4, success)
 rule4:
+  // <decl> ::= <type> <id> ;
+  NONTERMINAL_NS(_semicolon, rule5, success)
+rule5:
   // <decl> ::= <type> <id> = <expr> ;
   NONTERMINAL_N(_equals, fail)
   NONTERMINAL_N(expr, fail)
-  NONTERMINAL_NS(_semicolon, fail, success)
-rule5:
-  // <decl> ::= struct <id> ;
-  RESTORE()
-  NONTERMINAL_N(_struct, rule6)
-  NONTERMINAL_N(id, fail)
   NONTERMINAL_NS(_semicolon, fail, success)
 rule6:
   // <decl> ::= enum { <enum_list> } ;
@@ -1010,14 +1010,18 @@ void graft_CST(CSTNode* node) {
   //          +- <rule4>                    +- <rule5>
   //          +- <rule5>
   //
-  // specical case: <expr> and <stmt>
-  //   Since <expr> and <stmt> are important in further processing, I don't
-  //   remove it while grafting.
+  // specical case: <expr>, <stmt>, <def>, and <decl>
+  //   Since <expr>, <stmt>, <def>, and <decl> are important in further
+  //   processing, I don't remove them while grafting.
   //
   // +- <rule1>                      +- <rule1>
   //    +- <expr>   => graft_CST() =>   +- <expr>
   //       + <rule2>                       +- <rule2>
-  if (node->children.size() == 1 && node->children[0]->type != EXPR && node->children[0]->type != STMT) {
+  if (node->children.size() == 1 &&
+      node->children[0]->type != EXPR &&
+      node->children[0]->type != STMT &&
+      node->children[0]->type != DEF &&
+      node->children[0]->type != DECL) {
     CSTNode* temp = _graft_CST(node->children[0]);
 
     if (temp->children.size() == 0) {
@@ -1068,9 +1072,8 @@ void flatten_CST(CSTNode* node) {
       delete temp;
     }
     else if (node->children.back()->type == PROG ||
-             node->children.back()->type == MEM_DECL_LIST ||
              node->children.back()->type == STMT_LIST ||
-             node->children.back()->type == _EPSILON){
+             node->children.back()->type == _EPSILON) {
       delete node->children[0];
       node->children.pop_back();
     }
@@ -1099,7 +1102,10 @@ void flatten_CST(CSTNode* node) {
   //      +- <unary_expr>                        +- <unary_expr>
   //      +- <mul_op>      => flatten_CST() =>   +- <mul_op>
   //      +- <mul_expr>                          +- <unary_expr>
-  //         +- <unary_expr>
+  //         +- <unary_expr>                     +- <mul_op>
+  //            +- <mul_op>                      +- <unary_expr>
+  //            +- <mul_expr>
+  //               +- <unary_expr>
   //
   //    condition 2:
   //      The program works fine without this condition, why did I write it?
@@ -1146,9 +1152,49 @@ void flatten_CST(CSTNode* node) {
   //     }
   //   }
   // }
+  // case 5: <mem_decl_list>
+  if (node->type == DEF &&
+      node->children[3]->type == MEM_DECL_LIST &&
+      node->children[3]->children.size() == 0) {
+    delete node->children[3];
+    node->children.erase(node->children.begin() + 3);
+  }
 }
 
 void fix_CST(CSTNode* node) {
+  // case 1: expression-related nodes
+  //   Since CST is generated, there's no need to distinguish them, so I rename
+  //   them.
+  if (node->type == COND_EXPR ||
+      node->type == SHIFT_EXPR ||
+      node->type == ADD_EXPR ||
+      node->type == MUL_EXPR ||
+      node->type == UNARY_EXPR) {
+    node->type = EXPR;
+  }
+
+  // case 2: left-associative operators
+  //   Modify the structure of CST to reflact the calculation order of <expr>.
+  if (node->type == EXPR && node->children.size() > 3) {
+    int length = node->children.size();
+    if (node->children[length - 2]->type == EQ_OP ||
+        node->children[length - 2]->type == COND_OP ||
+        node->children[length - 2]->type == SHIFT_OP ||
+        node->children[length - 2]->type == ADD_OP ||
+        node->children[length - 2]->type == MUL_OP) {
+      CSTNode* left_child = new CSTNode(EXPR, "");
+      for (int i = 0; i < length - 2; i++) {
+        left_child->children.push_back(node->children[i]);
+      }
+      CSTNode* op = node->children[length - 2];
+      CSTNode* right_child = node->children[length - 1];
+      node->children.clear();
+      node->children.push_back(left_child);
+      node->children.push_back(op);
+      node->children.push_back(right_child);
+    }
+  }
+
   for (auto i : node->children) {
     fix_CST(i);
   }
@@ -1182,16 +1228,6 @@ void fix_CST(CSTNode* node) {
       delete node->children.back();
       node->children.pop_back();
     }
-  }
-
-  // case 2: expression-related nodes
-  //    Since CST is generated, there's no need to distinguish them, so I rename them.
-  if (node->type == COND_EXPR ||
-      node->type == SHIFT_EXPR ||
-      node->type == ADD_EXPR ||
-      node->type == MUL_EXPR ||
-      node->type == UNARY_EXPR) {
-    node->type = EXPR;
   }
 
   // case 3: <_equals>
@@ -1255,8 +1291,9 @@ void trim_CST(CSTNode* node) {
   // remove unnecessary node
   for (int i = node->children.size() - 1; i >= 0; i--) {
     CSTNode* temp = node->children[i];
-    if (temp->type == _LEFT_PAREN ||
-        temp->type == _RIGHT_PAREN ||
+    if (
+        // temp->type == _LEFT_PAREN ||
+        // temp->type == _RIGHT_PAREN ||
         // temp->type == _LEFT_BRACE ||
         // temp->type == _RIGHT_BRACE ||
         // temp->type == _LEFT_BRACKET ||

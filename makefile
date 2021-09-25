@@ -15,16 +15,23 @@ else
 	RM = rm -f
 endif
 
+ifndef MARK
+	MARK = '<expr>\|$$'
+endif
+
 all: $(OBJS)
 	$(CC) $(OBJS) -o $(EXE)
 
 $(OBJS): %.o: %.cc
 	$(CC) $(CFLAGS) -c $< -o $@
 
+run:
+	./$(EXE) ./test/$(FILE) | grep --color $(MARK)
+
 debug: $(TEST_DIR)/*
 	@for file in $^; do \
 		echo $${file}; \
-		./$(EXE) $${file}; \
+		./$(EXE) $${file} | grep --color $(MARK); \
 		echo; \
 	done
 
