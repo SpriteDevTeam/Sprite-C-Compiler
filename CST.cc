@@ -1168,6 +1168,25 @@ void flatten_CST(CSTNode* node) {
     delete node->children[3];
     node->children.erase(node->children.begin() + 3);
   }
+  // case 6: <entity>
+  // +- <lvalue>                                 +- <lvalue>
+  //    +- <id>                                     +- <id>
+  //    +- <_dot or _arrow>                         +- <_dot or _arrow>
+  //    +- <entity>           => flatten_CST() =>   +- <id>
+  //       +- <id>                                  +- <_dot or _arrow>
+  //       +- <_dot or _arrow>                      +- <id>
+  //       +- <entity>
+  //          +- <id>
+  if (node->type == ENTITY) {
+    if (node->children.size() > 1) {
+      CSTNode* temp = node->children.back();
+      node->children.pop_back();
+      for (auto &i : temp->children) {
+        node->children.push_back(i);
+      }
+      delete temp;
+    }
+  }
 }
 
 void fix_CST(CSTNode* node) {
@@ -1181,7 +1200,19 @@ void fix_CST(CSTNode* node) {
       node->type == UNARY_EXPR) {
     node->type = EXPR;
   }
+  else if (node->type == ENTITY) {
+    node->type = LVALUE;
+  }
 
+  // case 2-1: left-associative operators
+  //   Modify the structure of CST to reflact the order of calculation.
+  // +- <expr>                       + <expr>
+  //   +- <expr1>                      +- <expr>
+  //   +- <mul_op>                     |  +- <expr1>
+  //   +- <expr2>    => fix_CST() =>   |  +- <mul_op>
+  //   +- <mul_op>                     |  +- <expr2>
+  //   +- <expr3>                      +- <mul_op>
+  //                                   +- <expr3>
   if (node->type == EXPR && node->children.size() > 3) {
     int length = node->children.size();
     if (node->children[length - 2]->type == EQ_OP ||
@@ -1201,11 +1232,139 @@ void fix_CST(CSTNode* node) {
       node->children.push_back(right_child);
     }
   }
+  // case 2-2: left-associative operators
+  if (node->type == LVALUE && node->children.size() > 3) {
+    int length = node->children.size();
+    if (node->children[length - 2]->type == _ARROW ||
+        node->children[length - 2]->type == _DOT) {
+      CSTNode* left_child = new CSTNode(LVALUE, "");
+      for (int i = 0; i < length - 2; i++) {
+        left_child->children.push_back(node->children[i]);
+      }
+      CSTNode* op = node->children[length - 2];
+      CSTNode* right_child = node->children[length - 1];
+      node->children.clear();
+      node->children.push_back(left_child);
+      node->children.push_back(op);
+      node->children.push_back(right_child);
+    }
+  }
+
+  // case 3-1: recover <lvaule> node
+  // +- <expr>                   +- <expr>
+  //    +- <id>  => fix_CST() =>    +- <lvalue>
+  //                                   +- <id>
+  if (node->type == EXPR) {
+    for (int i = 0; i < int(node->children.size()); i++) {
+      if (node->children[i]->type == ID) {
+        CSTNode* new_node = new CSTNode(LVALUE, "");
+        new_node->children.push_back(node->children[i]);
+        node->children[i] = new_node;
+      }
+    }
+  }
+  else if (node->type == LVALUE && node->children.size() > 1) {
+    for (int i = 0; i < int(node->children.size()); i++) {
+      if (node->children[i]->type == ID) {
+        CSTNode* new_node = new CSTNode(LVALUE, "");
+        new_node->children.push_back(node->children[i]);
+        node->children[i] = new_node;
+      }
+    }
+  }
+  // case 3-2: recover <lvaule> node
+  // +- <expr>                          +- <expr>
+  //    +- <_ASTERISK>  => fix_CST() =>    +- <lvalue1>
+  //    +- <lvalue1>                          +- <_ASTERISK>
+  //                                          +- <lvalue1>
+  //
+  // case 4: rewrite <lvalue>++ to <lvalue> += <lvaule> + 1
+  //                                    +- <expr>
+  // +- <expr>                             +- <lvalue2>
+  //    +- <lvalue2>    => fix_CST() =>    +- <assign_op> (+= or -=)
+  //    +- <postfix_op>                    +- <expr>
+  //                                          +- <number> (1)
+  if (node->type == EXPR && node->children.size() == 2) {
+    if (node->children[0]->type == _ASTERISK ||
+        node->children[0]->type == _AMPERSAND) {
+      CSTNode* new_node = new CSTNode(LVALUE, "");
+      new_node->children = node->children;
+      node->children.clear();
+      node->children.push_back(new_node);
+    }
+    else if (node->children[0]->type == LVALUE &&
+             node->children[1]->type == POSTFIX_OP) {
+      CSTNode* number_node = new CSTNode(NUMBER, "1");
+      CSTNode* expr_node   = new CSTNode(EXPR, "");
+      node->children[1]->type = ASSIGN_OP;
+      if (node->children[1]->content == "++") {
+        node->children[1]->content = "+=";
+      }
+      else {
+        node->children[1]->content = "-=";
+      }
+      node->children.push_back(expr_node);
+      expr_node->children.push_back(number_node);
+    }
+  }
+
+  // case 5: rewrite <lvaleu> op= <expr> to <lvalue> = <lvalue> op <expr>
+  //         (op is short for a certain operator)
+  //                                  +- <expr>
+  //                                     +- <lvalue1>
+  // +- <expr>                           +- <_equals>
+  //    +- <lvalue1>                     +- <expr>
+  //    +- <assign_op>  => fix_CST() =>     +- <expr>
+  //    +- <expr1>                          |  + <lvalue1>
+  //                                        +- <shift_op, add_op, mul_op>
+  //                                        +- <expr1>
+  if (node->type == EXPR && node->children.size() == 3) {
+    if (node->children[1]->type == ASSIGN_OP && node->children[1]->content != "=") {
+      CSTNode* expr_node1 = new CSTNode(EXPR, "");
+      CSTNode* expr_node2 = new CSTNode(EXPR, "");
+      CSTNode* op_node;
+
+      if (node->children[1]->content == "<<=") {
+        op_node = new CSTNode(SHIFT_OP, "<<");
+      }
+      else if (node->children[1]->content == ">>=") {
+        op_node = new CSTNode(SHIFT_OP, ">>");
+      }
+      else if (node->children[1]->content == "+=") {
+        op_node = new CSTNode(ADD_OP, "+");
+      }
+      else if (node->children[1]->content == "-=") {
+        op_node = new CSTNode(ADD_OP, "-");
+      }
+      else if (node->children[1]->content == "*=") {
+        op_node = new CSTNode(MUL_OP, "*");
+      }
+      else if (node->children[1]->content == "/=") {
+        op_node = new CSTNode(MUL_OP, "/");
+      }
+      else if (node->children[1]->content == "%=") {
+        op_node = new CSTNode(MUL_OP, "%");
+      }
+
+      expr_node2->children.push_back(copy_CST(node->children[0]));
+      expr_node1->children.push_back(expr_node2);
+      expr_node1->children.push_back(op_node);
+      expr_node1->children.push_back(node->children[2]);
+      node->children[2] = expr_node1;
+      node->children[1]->type = _EQUALS;
+      node->children[1]->content = "=";
+    }
+  }
+
+  if (node->type == ASSIGN_OP) {
+    node->type = _EQUALS;
+  }
 
   for (auto i : node->children) {
     fix_CST(i);
   }
 
+  // case 6: <type>
   //    Let <type> node contains the message directly.
   //
   // +- <type>
@@ -1236,7 +1395,12 @@ void fix_CST(CSTNode* node) {
     }
   }
 
+  // case 7: <_equals>
+  // if (node->type == _EQUALS) {
+  //   node->type = ASSIGN_OP;
+  // }
 
+  // case 8: <mul_expr>
   //   Okay, this is a little difficult to explain, but this is not needed now.
   // if (node->children.size() > 3 &&
   //     node->children[node->children.size() - 2]->type == UNARY_OP &&
@@ -1248,6 +1412,7 @@ void fix_CST(CSTNode* node) {
   //   node->children.pop_back();
   // }
 
+  // case 9: <number> and <id>
   //   This is used to fix some errors caused by the fourth case in
   //   flatten_CST(), since that case is no longer reachable, this case is
   //   naturally commented out.
@@ -1264,6 +1429,7 @@ void fix_CST(CSTNode* node) {
   //   }
   // }
 
+  // case 10: <expr> and <lvalue>
   //    Note that fix_CST() is used after grift_CST(), and thus the following
   //    example is correct.
   // +- <expr1>
@@ -1596,4 +1762,12 @@ void _display_CST(CSTNode* node, std::string prefix, bool is_the_last) {
   for (int i = 0; i < length; i++) {
     _display_CST(node->children[i], prefix, i == length-1);
   }
+}
+
+CSTNode* copy_CST(CSTNode* node) {
+  CSTNode* new_node = new CSTNode(node->type, node->content);
+  for (auto i : node->children) {
+    new_node->children.push_back(copy_CST(i));
+  }
+  return new_node;
 }

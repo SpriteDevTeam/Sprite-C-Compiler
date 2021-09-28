@@ -406,6 +406,7 @@ void fix_CST(CSTNode* node);
 void trim_CST(CSTNode* node);
 void destruct_CST(CSTNode* node);
 void display_CST(CSTNode* node);
+CSTNode* copy_CST(CSTNode* node);
 
 CSTNode* _graft_CST(CSTNode* node);
 void _display_CST(CSTNode* node, std::string prefix, bool is_the_last);
