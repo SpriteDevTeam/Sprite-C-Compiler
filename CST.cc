@@ -41,7 +41,6 @@ CSTNode* decl(ListNode<Token>* &token) {
   ENTER_INFO(DECL)
 rule1:
   // <decl> ::= struct <id> ;
-  RESTORE()
   NONTERMINAL_N(_struct, rule2)
   NONTERMINAL_N(id, fail)
   NONTERMINAL_NS(_semicolon, fail, success)
@@ -613,40 +612,46 @@ CSTNode* term(ListNode<Token>* &token) {
   ENTER_INFO(TERM)
 rule1:
   // <term> ::= <keyword_func> ( <para_list> )
-  NONTERMINAL_N(keyword_func, rule2)
+  NONTERMINAL_N(keyword_func, rule3)
   NONTERMINAL_N(_left_paren, fail)
-  NONTERMINAL_N(para_list, fail)
+  NONTERMINAL_N(para_list, rule2)
   NONTERMINAL_NS(_right_paren, fail, success)
 rule2:
-  // <term> ::= <lvalue> ( <para_list> )
-  RESTORE()
-  NONTERMINAL_N(lvalue, rule6)
-  NONTERMINAL_N(_left_paren, rule3)
-  NONTERMINAL_N(para_list, fail)
+  // <term> ::= <keyword_func> ( )
   NONTERMINAL_NS(_right_paren, fail, success)
 rule3:
-  // <term> ::= <lvalue> <assign_op> <expr>
-  NONTERMINAL_N(assign_op, rule4)
-  NONTERMINAL_NS(expr, fail, success)
+  // <term> ::= <lvalue> ( <para_list> )
+  RESTORE()
+  NONTERMINAL_N(lvalue, rule8)
+  NONTERMINAL_N(_left_paren, rule5)
+  NONTERMINAL_N(para_list, rule4)
+  NONTERMINAL_NS(_right_paren, fail, success)
 rule4:
-  // <term> ::= <lvalue> <postfix_op>
-  NONTERMINAL_NS(postfix_op, rule5, success)
+  // <term> ::= <lvalue> ( )
+  NONTERMINAL_NS(_right_paren, fail, success)
 rule5:
+  // <term> ::= <lvalue> <assign_op> <expr>
+  NONTERMINAL_N(assign_op, rule6)
+  NONTERMINAL_NS(expr, fail, success)
+rule6:
+  // <term> ::= <lvalue> <postfix_op>
+  NONTERMINAL_NS(postfix_op, rule7, success)
+rule7:
   // <term> ::= <lvalue>
   goto success;
-rule6:
+rule8:
   // <term> ::= <number>
   RESTORE()
-  NONTERMINAL_NS(number, rule7, success)
-rule7:
+  NONTERMINAL_NS(number, rule9, success)
+rule9:
   // <term> ::= <char_lit>
   RESTORE()
-  NONTERMINAL_NS(char_lit, rule8, success)
-rule8:
+  NONTERMINAL_NS(char_lit, rule10, success)
+rule10:
   // <term> ::= <string_lit>
   RESTORE()
-  NONTERMINAL_NS(string_lit, rule9, success)
-rule9:
+  NONTERMINAL_NS(string_lit, rule11, success)
+rule11:
   // <term> ::= ( <expr> )
   RESTORE()
   NONTERMINAL_N(_left_paren, fail)
@@ -1003,7 +1008,6 @@ CSTNode* build_CST(List<Token>* list) {
 
 void graft_CST(CSTNode* node) {
   // general cases:
-  //
   // +- <rule1>
   //    +- <rule2>                       +- <rule1>
   //       +- <rule3>   => graft_CST() =>   +- <rule4>
@@ -1013,7 +1017,6 @@ void graft_CST(CSTNode* node) {
   // specical case: <expr>, <stmt>, <def>, and <decl>
   //   Since <expr>, <stmt>, <def>, and <decl> are important in further
   //   processing, I don't remove them while grafting.
-  //
   // +- <rule1>                      +- <rule1>
   //    +- <expr>   => graft_CST() =>   +- <expr>
   //       + <rule2>                       +- <rule2>
@@ -1050,7 +1053,6 @@ void flatten_CST(CSTNode* node) {
   }
 
   // case 1: <prog>, <mem_decl_list>, and <stmt_list>
-  //
   // +- <prog>
   //    +- <def>                           +- <prog>
   //    +- <prog>       => flatten_CST() =>   +- <def>
@@ -1079,7 +1081,6 @@ void flatten_CST(CSTNode* node) {
     }
   }
   // case 2: <enum_list>
-  //
   // +- <enum_list>                      +- <enum_list>
   //    +- <id>                             +- <id>
   //    +- <comma>    => flatten_CST() =>   +- <comma>
@@ -1097,7 +1098,6 @@ void flatten_CST(CSTNode* node) {
   }
   // case 3: rules which are right-recursive (except <unary_expr>)
   //   condition 1:
-  //
   //   +- <mul_expr>                          +- <mul_expr>
   //      +- <unary_expr>                        +- <unary_expr>
   //      +- <mul_op>      => flatten_CST() =>   +- <mul_op>
@@ -1108,7 +1108,7 @@ void flatten_CST(CSTNode* node) {
   //               +- <unary_expr>
   //
   //    condition 2:
-  //      The program works fine without this condition, why did I write it?
+  //     It looks fine without this condition, why did I write it?
   else if (node->type == EXPR ||
            node->type == COND_EXPR ||
            node->type == SHIFT_EXPR ||
@@ -1153,6 +1153,15 @@ void flatten_CST(CSTNode* node) {
   //   }
   // }
   // case 5: <mem_decl_list>
+  //           => by case 1 =>          => by case 5 =>
+  // +- <def>                 +- <def>                 +- <def>
+  //    +- <_struct>             +- <_struct>              +- <_struct>
+  //    +- <id>                  +- <id>                   +- <id>
+  //    +- <_left_brace>         +- <_left_brace>          +- <_left_brace>
+  //    +- <mem_decl_list>       +- <mem_decl_list>        +- <_right_brace>
+  //       +- <_epsilon>         +- <_right_brace>         +- <_semicolon>
+  //    +- <_right_brace>        +- <_semicolon>
+  //    +- <_semicolon>
   if (node->type == DEF &&
       node->children[3]->type == MEM_DECL_LIST &&
       node->children[3]->children.size() == 0) {
@@ -1173,8 +1182,6 @@ void fix_CST(CSTNode* node) {
     node->type = EXPR;
   }
 
-  // case 2: left-associative operators
-  //   Modify the structure of CST to reflact the calculation order of <expr>.
   if (node->type == EXPR && node->children.size() > 3) {
     int length = node->children.size();
     if (node->children[length - 2]->type == EQ_OP ||
@@ -1199,7 +1206,6 @@ void fix_CST(CSTNode* node) {
     fix_CST(i);
   }
 
-  // case 1: <type>
   //    Let <type> node contains the message directly.
   //
   // +- <type>
@@ -1230,12 +1236,7 @@ void fix_CST(CSTNode* node) {
     }
   }
 
-  // case 3: <_equals>
-  if (node->type == _EQUALS) {
-    node->type = ASSIGN_OP;
-  }
 
-  // case 4: <mul_expr>
   //   Okay, this is a little difficult to explain, but this is not needed now.
   // if (node->children.size() > 3 &&
   //     node->children[node->children.size() - 2]->type == UNARY_OP &&
@@ -1247,7 +1248,6 @@ void fix_CST(CSTNode* node) {
   //   node->children.pop_back();
   // }
 
-  // case 5: <number> and <id>
   //   This is used to fix some errors caused by the fourth case in
   //   flatten_CST(), since that case is no longer reachable, this case is
   //   naturally commented out.
@@ -1264,10 +1264,8 @@ void fix_CST(CSTNode* node) {
   //   }
   // }
 
-  // case 6: <expr> and <lvalue>
   //    Note that fix_CST() is used after grift_CST(), and thus the following
-  //    example is not wrong.
-  //
+  //    example is correct.
   // +- <expr1>
   //    +- <_left_paren>
   //    +- <expr2>       => fix_CST() => +- <expr1>

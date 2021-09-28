@@ -188,7 +188,9 @@
 //              | ~
 //
 // <term> ::= <keyword_func> ( <para_list> )
+//          | <keyword_func> ( )
 //          | <lvalue> ( <para_list> )
+//          | <lvalue> ( )
 //          | <lvalue> <assign_op> <expr>
 //          | <lvalue> <postfix_op>
 //          | <lvalue>
@@ -219,8 +221,8 @@
 // <para_list> ::= <expr> , <para_list>
 //               | <expr>
 //
-// 1. Any ASTs formed by the above rules will have all operators to be
-//    right-associative. When traversing the AST, operators that have
+// 1. Any CSTs formed by the above rules will have all operators to be
+//    right-associative. When traversing the CST, operators that have
 //    left-associative should be interpreted carefully.
 // 2. One important principle in implementing the above rules is that every
 //    rule containing both nonterminals and terminals is converted to another
