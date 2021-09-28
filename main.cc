@@ -4,6 +4,7 @@
 #include "List.h"
 #include "Parser.h"
 #include "Scanner.h"
+#include "SymbolTable.h"
 #include "Token.h"
 
 int main(int argc, char* argv[]) {
@@ -43,6 +44,9 @@ int main(int argc, char* argv[]) {
   trim_CST(root);
   std::cout << "\n--- Trimmed CST ---" << std::endl << std::endl;
   display_CST(root);
+
+  auto st = build_symbol_table(root);
+  display_symbol_table(st);
 
   destruct_CST(root);
   delete list;
