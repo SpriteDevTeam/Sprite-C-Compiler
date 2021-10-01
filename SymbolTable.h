@@ -43,7 +43,8 @@ enum {
   ST_ERR_NOT_LVALUE_WHILE_ASSIGN,
   ST_ERR_ARG_NUM_NOT_FIT,
   ST_ERR_ARG_TYPE_NOT_FIT,
-  ST_ERR_TYPE_NOT_FIT
+  ST_ERR_TYPE_NOT_FIT,
+  ST_ERR_NOT_POINTER_WHILE_ACCESS
 };
 
 using Key = std::tuple<int, std::string, std::string>;

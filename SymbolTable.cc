@@ -80,7 +80,9 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
         Info* info = new Info();
         if (decl_node->children.size() > 2) {
           info->context = decl_node->children[3];
-          if (type != resolve_expr(table, info->context)) {
+          std::string expr_type = resolve_expr(table, info->context);
+          if ((type != expr_type) &&
+              !(expr_type == "void *" && type.back() == '*')) {
             resolve_error(ST_ERR_TYPE_NOT_FIT);
           }
           //_build_symbol_table_local(table, info->context);
@@ -245,7 +247,9 @@ void _build_symbol_table_local(SymbolTable* table, CSTNode* node) {
       Info* info = new Info();
       if (node->children.size() > 2) {
         info->context = node->children[3];
-        if (type != resolve_expr(table, info->context)) {
+        std::string expr_type = resolve_expr(table, info->context);
+        if ((type != expr_type) &&
+            !(expr_type == "void *" && type.back() == '*')) {
           resolve_error(ST_ERR_TYPE_NOT_FIT);
         }
       }
@@ -255,7 +259,7 @@ void _build_symbol_table_local(SymbolTable* table, CSTNode* node) {
       resolve_expr(table, node->children[2]);
       _build_symbol_table_local(table, node->children[4]);
 
-      if (node->children.size() > 4) {
+      if (node->children.size() > 5) {
         _build_symbol_table_local(table, node->children[6]);
       }
     }
@@ -448,9 +452,13 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
         node->children[1]->type == SHIFT_OP ||
         node->children[1]->type == ADD_OP ||
         node->children[1]->type == MUL_OP) {
-      resolve_expr(table, node->children[0]);
-      resolve_expr(table, node->children[2]);
+      std::string first_type = resolve_expr(table, node->children[0]);
+      std::string second_type = resolve_expr(table, node->children[2]);
+      if (first_type != second_type) {
+        resolve_error(ST_ERR_TYPE_NOT_FIT);
+      }
       std::cout << node->children[1]->content << std::endl;
+      return first_type;
     }
     // assignment
     // +- <expr>
@@ -459,8 +467,15 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
     //    +- <expr>
     else if (node->children[1]->type == _EQUALS) {
       std::string lvalue_type = resolve_lvalue(table, node->children[0]);
-      resolve_expr(table, node->children[2]);
+      std::string expr_type = resolve_expr(table, node->children[2]);
+      std::cout << expr_type << std::endl;
+      if ((lvalue_type != expr_type) &&
+          !(expr_type == "void *" && lvalue_type.back() == '*')) {
+        resolve_error(ST_ERR_TYPE_NOT_FIT);
+      }
       std::cout << node->children[1]->content << std::endl;
+      std::cout << lvalue_type << std::endl;
+      return lvalue_type;
     }
     // member access
     // should not reach here
@@ -480,7 +495,11 @@ std::string resolve_lvalue(SymbolTable* table, CSTNode* node) {
   // +- <lvalue>
   //    +- <id>
   if (node->children.size() == 1) {
-    ;
+    std::string var_type = table->ambiguous_lookup(ST_VAR, node->children[0]->content);
+    if (var_type == "") {
+      resolve_error(ST_ERR_NOT_DECL_BEFORE_USE);
+    }
+    return var_type;
   }
   // +- <lvalue>
   //    +- <_asterisk or _ampersand>
@@ -501,7 +520,18 @@ std::string resolve_lvalue(SymbolTable* table, CSTNode* node) {
   //    +- <expr>
   //    +- <_right_bracket>
   else if (node->children.size() == 4) {
-    ;
+    std::string lvalue_type = resolve_lvalue(table, node->children[0]);
+    if (lvalue_type == "") {
+      resolve_error(ST_ERR_NOT_DECL_BEFORE_USE);
+    }
+    else if (lvalue_type.back() != '*') {
+      resolve_error(ST_ERR_NOT_POINTER_WHILE_ACCESS);
+    }
+    std::string index_type = resolve_expr(table, node->children[2]);
+    if (index_type != "int") {
+      resolve_error(ST_ERR_TYPE_NOT_FIT);
+    }
+    return lvalue_type.substr(0, lvalue_type.size()-2);
   }
   else {
     ;
@@ -542,6 +572,10 @@ void resolve_error(int err_code) {
     }
     case ST_ERR_TYPE_NOT_FIT: {
       std::cerr << "ST_ERR_TYPE_NOT_FIT" << std::endl;
+      break;
+    }
+    case ST_ERR_NOT_POINTER_WHILE_ACCESS: {
+      std::cerr << "ST_ERR_NOT_POINTER_WHILE_ACCESS" << std::endl;
       break;
     }
     default: {
