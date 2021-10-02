@@ -42,6 +42,12 @@ SymbolTable* build_symbol_table(CSTNode* node) {
 }
 
 void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
+  table->insert({ST_KEYWORD_FUNC, "open", "int"}, new Info{{"char *", "filename"}, nullptr});
+  table->insert({ST_KEYWORD_FUNC, "close", "void"}, new Info{{"int", "fd"}, nullptr});
+  table->insert({ST_KEYWORD_FUNC, "read", "void"}, new Info{{"int", "fd", "char *", "buf", "int", "nbytes"}, nullptr});
+  table->insert({ST_KEYWORD_FUNC, "write", "void"}, new Info{{"int", "fd", "char *", "buf", "int", "nbytes"}, nullptr});
+  table->insert({ST_KEYWORD_FUNC, "malloc", "void *"}, new Info{{"int", "nbytes"}, nullptr});
+  table->insert({ST_KEYWORD_FUNC, "free", "void"}, new Info{{"void *", "ptr"}, nullptr});
   for (auto i : node->children) {
     // decl
     if (i->type == DECL) {
@@ -82,7 +88,8 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
           info->context = decl_node->children[3];
           std::string expr_type = resolve_expr(table, info->context);
           if ((type != expr_type) &&
-              !(expr_type == "void *" && type.back() == '*')) {
+              !(expr_type == "void *" && type.back() == '*') &&
+              !(type == "void *" && expr_type.back() == '*')) {
             resolve_error(ST_ERR_TYPE_NOT_FIT);
           }
           //_build_symbol_table_local(table, info->context);
@@ -152,6 +159,17 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
             info->context = def_node->children[6];
             SymbolTable* new_table = new SymbolTable(table);
             info->children.push_back(new_table);
+
+            // put parameter into local symboltable
+            int category = ST_VAR;
+            std::string name;
+            std::string type;
+            for (int i = 0; i < int(info->attrs.size()); i+=2) {
+              name = info->attrs[i+1];
+              type = info->attrs[i];
+              new_table->insert({category, name, type}, new Info({{}, nullptr}));
+            }
+
             _build_symbol_table_local(new_table, info->context);
           }
           else {
@@ -176,6 +194,17 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
             info->context = def_node->children[6];
             SymbolTable* new_table = new SymbolTable(table);
             info->children.push_back(new_table);
+
+            // put parameter into local symboltable
+            int category = ST_VAR;
+            std::string name;
+            std::string type;
+            for (int i = 0; i < int(info->attrs.size()); i+=2) {
+              name = info->attrs[i+1];
+              type = info->attrs[i];
+              new_table->insert({category, name, type}, new Info({{}, nullptr}));
+            }
+
             _build_symbol_table_local(new_table, info->context);
           }
           else {
@@ -249,7 +278,8 @@ void _build_symbol_table_local(SymbolTable* table, CSTNode* node) {
         info->context = node->children[3];
         std::string expr_type = resolve_expr(table, info->context);
         if ((type != expr_type) &&
-            !(expr_type == "void *" && type.back() == '*')) {
+            !(expr_type == "void *" && type.back() == '*') &&
+            !(type == "void *" && expr_type.back() == '*')) {
           resolve_error(ST_ERR_TYPE_NOT_FIT);
         }
       }
@@ -306,6 +336,10 @@ void _display_symbol_table(SymbolTable* table, std::string prefix, bool is_globa
     switch (category) {
       case ST_FUNC: {
         std::cout << prefix + "function: " << type << " " << name << std::endl;
+        break;
+      }
+      case ST_KEYWORD_FUNC: {
+        std::cout << prefix + "keyword_function: " << type << " " << name << std::endl;
         break;
       }
       case ST_ENUM: {
@@ -390,14 +424,23 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
   //       +- <expr>
   //    +- <_right_paren>
   else if (node->children[0]->type == KEYWORD_FUNC) {
-    // with argument
-    if (node->children.size() == 4) {
-      ;
+    std::string ret_type = table->ambiguous_lookup(ST_KEYWORD_FUNC, node->children[0]->content);
+    Info* func_info = table->lookup(ST_KEYWORD_FUNC, node->children[0]->content, ret_type);
+    if (func_info->attrs.size() != node->children[2]->children.size()*2) {
+      resolve_error(ST_ERR_ARG_NUM_NOT_FIT);
     }
-    // without argument
-    else {
-      ;
+    for (int i = 0; i < int(func_info->attrs.size()); i += 2) {
+      std::cout << func_info->attrs[i] << std::endl;
+      std::cout << resolve_expr(table, node->children[2]->children[i/2]) << std::endl;
+      std::string arg_type = func_info->attrs[i];
+      std::string para_type = resolve_expr(table, node->children[2]->children[i/2]);
+      if ((arg_type != para_type) &&
+          !(para_type == "void *" && arg_type.back() == '*') &&
+          !(arg_type == "void *" && para_type.back() == '*')) {
+        resolve_error(ST_ERR_ARG_TYPE_NOT_FIT);
+      }
     }
+    return ret_type;
   }
   // + <expr>
   //   +- <lvalue>
@@ -419,7 +462,11 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
     for (int i = 0; i < int(func_info->attrs.size()); i += 2) {
       std::cout << func_info->attrs[i] << std::endl;
       std::cout << resolve_expr(table, node->children[2]->children[i/2]) << std::endl;
-      if (func_info->attrs[i] != resolve_expr(table, node->children[2]->children[i/2])) {
+      std::string arg_type = func_info->attrs[i];
+      std::string para_type = resolve_expr(table, node->children[2]->children[i/2]);
+      if ((arg_type != para_type) &&
+          !(para_type == "void *" && arg_type.back() == '*') &&
+          !(arg_type == "void *" && para_type.back() == '*')) {
         resolve_error(ST_ERR_ARG_TYPE_NOT_FIT);
       }
     }
@@ -470,7 +517,8 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
       std::string expr_type = resolve_expr(table, node->children[2]);
       std::cout << expr_type << std::endl;
       if ((lvalue_type != expr_type) &&
-          !(expr_type == "void *" && lvalue_type.back() == '*')) {
+          !(expr_type == "void *" && lvalue_type.back() == '*') &&
+          !(lvalue_type == "void *" && expr_type.back() == '*')) {
         resolve_error(ST_ERR_TYPE_NOT_FIT);
       }
       std::cout << node->children[1]->content << std::endl;

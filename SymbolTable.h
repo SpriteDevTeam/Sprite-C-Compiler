@@ -30,6 +30,7 @@
 
 enum {
   ST_FUNC = 0,
+  ST_KEYWORD_FUNC,
   ST_ENUM,
   ST_STRUCT,
   ST_VAR
