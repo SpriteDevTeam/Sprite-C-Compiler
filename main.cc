@@ -6,6 +6,7 @@
 #include "Scanner.h"
 #include "SymbolTable.h"
 #include "Token.h"
+#include "CodeGen.h"
 
 int main(int argc, char* argv[]) {
   // maybe some checks to argc and argv
@@ -47,6 +48,8 @@ int main(int argc, char* argv[]) {
 
   auto st = build_symbol_table(root);
   display_symbol_table(st);
+
+  gen_code(st);
 
   destruct_CST(root);
   delete list;

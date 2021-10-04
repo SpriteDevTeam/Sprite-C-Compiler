@@ -160,14 +160,15 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
             SymbolTable* new_table = new SymbolTable(table);
             info->children.push_back(new_table);
 
-            // put parameter into local symboltable
+            // put parameter into local symbol table
             int category = ST_VAR;
             std::string name;
             std::string type;
+            int effective_addr = -8; // first 8 bytes are ra and s0(fp)
             for (int i = 0; i < int(info->attrs.size()); i+=2) {
               name = info->attrs[i+1];
               type = info->attrs[i];
-              new_table->insert({category, name, type}, new Info({{}, nullptr}));
+              new_table->insert({category, name, type}, new Info{{}, nullptr, (effective_addr-=4)});
             }
 
             _build_symbol_table_local(new_table, info->context);
@@ -195,14 +196,15 @@ void _build_symbol_table_global(SymbolTable* table, CSTNode* node) {
             SymbolTable* new_table = new SymbolTable(table);
             info->children.push_back(new_table);
 
-            // put parameter into local symboltable
+            // put parameter into local symbol table
             int category = ST_VAR;
             std::string name;
             std::string type;
+            int effective_addr = -8; // first 8 bytes are ra and s0(fp)
             for (int i = 0; i < int(info->attrs.size()); i+=2) {
               name = info->attrs[i+1];
               type = info->attrs[i];
-              new_table->insert({category, name, type}, new Info({{}, nullptr}));
+              new_table->insert({category, name, type}, new Info{{}, nullptr, (effective_addr-=4)});
             }
 
             _build_symbol_table_local(new_table, info->context);
@@ -283,6 +285,7 @@ void _build_symbol_table_local(SymbolTable* table, CSTNode* node) {
           resolve_error(ST_ERR_TYPE_NOT_FIT);
         }
       }
+      info->addr = -8 - 4*(table->data.size()+1); // first 8 bytes are ra and s0(fp)
       table->insert({category, name, type}, info);
     }
     else if (node->children[0]->type == _IF) {
@@ -371,6 +374,11 @@ void _display_symbol_table(SymbolTable* table, std::string prefix, bool is_globa
         _display_CST(info->context, prefix + "        ", true);
       else
         std::cout << prefix + "        None" << std::endl;
+
+      if (category == ST_VAR && !is_global) {
+        std::cout << prefix + "    effective address: \n";
+        std::cout << prefix + "        " << info->addr << std::endl;
+      }
     }
 
     if (is_global) {
@@ -478,8 +486,12 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
     //    +- <unary_op>
     //    +- <expr>
     if (node->children[0]->type == UNARY_OP) {
-      resolve_expr(table, node->children[1]);
+      std::string type = resolve_expr(table, node->children[1]);
+      if (type != "int"){
+        resolve_error(ST_ERR_TYPE_NOT_FIT);
+      }
       std::cout << node->children[0]->content << std::endl;
+      return type;
     }
     // address-of and dereference
     // should not reach here

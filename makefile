@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -Wno-unused-label -Wno-unused-variable -g
 EXE = main
-OBJS = main.o Token.o List.o Scanner.o Parser.o CST.o SymbolTable.o
+OBJS = main.o Token.o List.o Scanner.o Parser.o CST.o SymbolTable.o CodeGen.o
 TEST_DIR = ./test
 
 ifdef OS # only windows define OS

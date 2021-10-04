@@ -56,6 +56,7 @@ struct SymbolTable;
 struct Info {
   std::vector<std::string> attrs;
   CSTNode* context = nullptr;
+  int addr = 0; // local var effective address
   std::vector<SymbolTable*> children;
 };
 
