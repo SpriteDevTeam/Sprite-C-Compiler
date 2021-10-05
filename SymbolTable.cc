@@ -544,6 +544,28 @@ std::string resolve_expr(SymbolTable* table, CSTNode* node) {
       std::cerr << "resolve_expr: reach member access" << std::endl;
     }
   }
+
+  else if (node->children.size() == 4) {
+    // arithmetic
+    //+- <expr>
+    //   +- <lvalue>
+    //      +- <id> ==> arr
+    //   +- <_left_bracket> ==> [
+    //   +- <expr>
+    //   +- <_right_bracket> ==> ]
+    std::string lvalue_type = resolve_lvalue(table, node->children[0]);
+    if (lvalue_type == "") {
+      resolve_error(ST_ERR_NOT_DECL_BEFORE_USE);
+    }
+    else if (lvalue_type.back() != '*') {
+      resolve_error(ST_ERR_NOT_POINTER_WHILE_ACCESS);
+    }
+    std::string index_type = resolve_expr(table, node->children[2]);
+    if (index_type != "int") {
+      resolve_error(ST_ERR_TYPE_NOT_FIT);
+    }
+    return lvalue_type.substr(0, lvalue_type.size()-2);
+  }
   else {
     // should not reach here
     std::cerr << "resolve_expr: unknown node: " << node->type << " " << node->content << std::endl;

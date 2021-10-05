@@ -986,7 +986,7 @@ bool token_backward(ListNode<Token>* &token) {
 CSTNode* build_CST(List<Token>* list) {
   // roughly check, needs better implementation in the future
   if (list == nullptr || list->head == nullptr) {
-    std::fprintf(stderr, "AST Error: AST build failed: list is empty\n");
+    std::fprintf(stderr, "CST Error: CST build failed: list is empty\n");
     exit(1);
   }
 
@@ -996,7 +996,7 @@ CSTNode* build_CST(List<Token>* list) {
   if ((root = prog(token)) == nullptr || token != nullptr) {
     std::fprintf(
       stderr,
-      "AST Error: AST build failed: syntax error near line %d, colunm %d\n",
+      "CST Error: CST build failed: syntax error near line %d, colunm %d\n",
       error_token->data->line,
       error_token->data->column
     );

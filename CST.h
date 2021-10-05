@@ -6,8 +6,8 @@
 #include "List.h"
 #include "Token.h"
 
-#define INIT(ast_type) \
-  CSTNode* node = new CSTNode(ast_type, ""); \
+#define INIT(cst_type) \
+  CSTNode* node = new CSTNode(cst_type, ""); \
   CSTNode* temp = nullptr; \
   ListNode<Token>* token_copy = token;
 
@@ -35,35 +35,35 @@
     goto success_rule; \
   }
 
-#define TERMINAL_TYPE_NF(_type, ast_type, next_rule, fail_rule) \
+#define TERMINAL_TYPE_NF(_type, cst_type, next_rule, fail_rule) \
   if (token->data->type == _type) { \
     std::string content = token->data->content; \
     if (token_forward(token)) \
-      return new CSTNode(ast_type, content); \
+      return new CSTNode(cst_type, content); \
     else goto fail_rule; \
   } \
   else goto next_rule;
 
-#define TERMINAL_CONTENT_NF(terminal, ast_type, next_rule, fail_rule) \
+#define TERMINAL_CONTENT_NF(terminal, cst_type, next_rule, fail_rule) \
   if (token->data->content == terminal) { \
     std::string content = token->data->content; \
     if (token_forward(token)) \
-      return new CSTNode(ast_type, content); \
+      return new CSTNode(cst_type, content); \
     else goto fail_rule; \
   } \
   else goto next_rule;
 
-#define TERMINAL_CONTENT_NO_CHECK_N(terminal, ast_type, next_rule) \
+#define TERMINAL_CONTENT_NO_CHECK_N(terminal, cst_type, next_rule) \
   if (token->data->content == terminal) { \
     std::string content = token->data->content; \
     token_forward(token); \
-    return new CSTNode(ast_type, content); \
+    return new CSTNode(cst_type, content); \
   } \
   else goto next_rule;
 
-#define ENTER_INFO(ast_type) \
+#define ENTER_INFO(cst_type) \
   if (DEBUG) { \
-    if (token) std::cerr << #ast_type << ": " << token->data->content << std::endl; \
+    if (token) std::cerr << #cst_type << ": " << token->data->content << std::endl; \
   }
 
 #define TERMINAL_FAIL() \
